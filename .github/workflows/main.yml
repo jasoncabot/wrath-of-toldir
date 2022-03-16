@@ -16,7 +16,15 @@ jobs:
           node-version: '14'
 
       - name: Install Dependencies
-        run: npm install
+        run: yarn
+        working-directory: ./client
+
+      - name: Compile FlatBuffer
+        run: |
+          # "These are committed but just in case you forget how to generate them..."
+          # flatc -o ./client/src/models/ --ts ./shared/flatbuffers/*.fbs --ts
+          # flatc -o ./server/src/models/ --ts ./shared/flatbuffers/*.fbs --ts
 
       - name: Build Packages
-        run: npm run build
+        run: yarn build
+        working-directory: ./client

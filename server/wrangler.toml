@@ -1,0 +1,26 @@
+name = "wrath-of-toldir-server"
+type = "javascript"
+
+account_id = ""
+workers_dev = true
+# route = ""
+# zone_id = ""
+
+compatibility_date = "2022-03-12"
+compatibility_flags = []
+
+[durable_objects]
+bindings = [
+  { name = "MAP", class_name = "Map" },
+]
+
+[build]
+command = "yarn build"
+
+[build.upload]
+format = "modules"
+dir = "dist"
+main = "./index.mjs"
+
+[miniflare]
+durable_objects_persist = true

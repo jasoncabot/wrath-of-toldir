@@ -1,0 +1,32 @@
+include "events.fbs";
+
+namespace WrathOfToldir.Commands;
+
+table MoveCommand {
+    pos: Vec3;
+}
+
+table JoinCommand {
+    pos: Vec3;
+    name: string;
+}
+
+table LeaveCommand {
+}
+
+table AttackCommand {
+}
+
+union Action {
+    MoveCommand,
+    JoinCommand,
+    LeaveCommand,
+    AttackCommand
+}
+
+table Command {
+    seq: uint;
+    action: Action;
+}
+
+root_type Command;

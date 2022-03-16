@@ -1,0 +1,29 @@
+{
+	"folders": [
+		{
+			"path": "./client",
+			"name": "Web Client"
+		},
+		{
+			"path": "./server",
+			"name": "Server"
+		},
+		{
+			"path": "./shared",
+			"name": "Shared"
+		},		
+		{
+			"path": "./.github",
+			"name": "GitHub"
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"**/node_modules": true,
+			"**/yarn.lock": true,
+			"**/.mf": true,
+			"**/dist/": true
+		}
+
+	}
+}

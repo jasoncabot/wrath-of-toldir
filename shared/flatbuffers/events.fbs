@@ -1,0 +1,41 @@
+namespace WrathOfToldir;
+
+struct Vec3 {
+  x:short;
+  y:short;
+  z:short;
+}
+
+namespace WrathOfToldir.Events;
+
+table MoveEvent {
+    key: int32;
+    pos: Vec3;
+}
+
+table JoinEvent {
+    key: int32;
+    pos: Vec3;
+    name: string;
+}
+
+table LeaveEvent {
+    key: int32;
+}
+
+table AttackEvent {
+    key: int32;
+}
+
+union Update { 
+    JoinEvent,
+    MoveEvent,
+    LeaveEvent,
+    AttackEvent,
+}
+
+table EventLog {
+    events: [Update];
+}
+
+root_type EventLog;

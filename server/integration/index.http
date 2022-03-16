@@ -1,0 +1,8 @@
+### Show map fairweather
+GET http://127.0.0.1:8787/api/map/fairweather
+Content-type: application/json
+
+### 
+POST http://127.0.0.1:8787/api/map/fairweather/connection
+Content-type: application/json
+Upgrade: websocket
