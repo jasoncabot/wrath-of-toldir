@@ -62,7 +62,7 @@ export class Map implements DurableObject {
                     // TODO: ensure that socketKey matches the key we stored earlier
                     await this.handleSession(server, playerId);
 
-                    return new Response("", {
+                    return new Response(null, {
                         status: 101,
                         headers: {
                             'Access-Control-Allow-Origin': 'http://localhost:8080',
@@ -194,17 +194,22 @@ export class Map implements DurableObject {
                     // update game state
                     delete this.connections[playerId];
 
-                    // inform other players
-                    const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
-                    players.forEach(otherPlayerId => {
-                        if (otherPlayerId == playerId) return;
-                        const { builder, eventOffsets, eventTypeOffsets } = createEventStore(otherPlayerId);
+                    if (Object.keys(this.connections).length === 0) {
+                        // no one is connected, no point to carry on ticking
+                        clearInterval(this.intervalHandle);
+                    } else {
+                        // inform other players
+                        const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
+                        players.forEach(otherPlayerId => {
+                            if (otherPlayerId == playerId) return;
+                            const { builder, eventOffsets, eventTypeOffsets } = createEventStore(otherPlayerId);
 
-                        LeaveEvent.startLeaveEvent(builder);
-                        LeaveEvent.addKey(builder, player.key);
-                        eventOffsets.push(LeaveEvent.endLeaveEvent(builder));
-                        eventTypeOffsets.push(Update.LeaveEvent);
-                    });
+                            LeaveEvent.startLeaveEvent(builder);
+                            LeaveEvent.addKey(builder, player.key);
+                            eventOffsets.push(LeaveEvent.endLeaveEvent(builder));
+                            eventTypeOffsets.push(Update.LeaveEvent);
+                        });
+                    }
                     break;
                 }
                 case Action.AttackCommand: {
