@@ -24,3 +24,7 @@ main = "./index.mjs"
 
 [miniflare]
 durable_objects_persist = true
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Map"]
