@@ -25,12 +25,21 @@ key():number {
   return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
 }
 
+facing():number {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
+}
+
 static startAttackEvent(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
   builder.addFieldInt32(0, key, 0);
+}
+
+static addFacing(builder:flatbuffers.Builder, facing:number) {
+  builder.addFieldInt8(1, facing, 0);
 }
 
 static endAttackEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -38,9 +47,10 @@ static endAttackEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createAttackEvent(builder:flatbuffers.Builder, key:number):flatbuffers.Offset {
+static createAttackEvent(builder:flatbuffers.Builder, key:number, facing:number):flatbuffers.Offset {
   AttackEvent.startAttackEvent(builder);
   AttackEvent.addKey(builder, key);
+  AttackEvent.addFacing(builder, facing);
   return AttackEvent.endAttackEvent(builder);
 }
 }

@@ -20,8 +20,17 @@ static getSizePrefixedRootAsAttackCommand(bb:flatbuffers.ByteBuffer, obj?:Attack
   return (obj || new AttackCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+facing():number {
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
+}
+
 static startAttackCommand(builder:flatbuffers.Builder) {
-  builder.startObject(0);
+  builder.startObject(1);
+}
+
+static addFacing(builder:flatbuffers.Builder, facing:number) {
+  builder.addFieldInt8(0, facing, 0);
 }
 
 static endAttackCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -29,8 +38,9 @@ static endAttackCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createAttackCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+static createAttackCommand(builder:flatbuffers.Builder, facing:number):flatbuffers.Offset {
   AttackCommand.startAttackCommand(builder);
+  AttackCommand.addFacing(builder, facing);
   return AttackCommand.endAttackCommand(builder);
 }
 }

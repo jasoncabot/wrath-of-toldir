@@ -8,7 +8,10 @@ import { MoveCommand, JoinCommand, LeaveCommand, Action, Vec3 } from '../../mode
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
-import { SpriteTexture } from '../objects/playerCharacter';
+import { normalisedFacingDirection, preloadPlayerCharacter, SpriteTexture } from '../objects/playerCharacter';
+import Weapon, { preloadWeapon } from '../objects/weapon';
+
+const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
 export default class MainScene extends Phaser.Scene {
   fpsText: FpsText
@@ -18,7 +21,7 @@ export default class MainScene extends Phaser.Scene {
   map: Phaser.Tilemaps.Tilemap
   interfaceCamera: Phaser.Cameras.Scene2D.Camera;
   onPositionChangedSubscription: any;
-  sword: Phaser.GameObjects.Sprite;
+  sword: Weapon;
   connection: WebSocket;
 
   constructor() {
@@ -26,52 +29,8 @@ export default class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    const rate = 16;
-    this.anims.create({
-      key: 'attack_sword_' + Direction.DOWN,
-      frames: this.anims.generateFrameNumbers('sword', { frames: [0, 1, 2, 3] }),
-      frameRate: rate,
-      hideOnComplete: true
-    });
-    this.anims.create({
-      key: 'attack_sword_' + Direction.UP,
-      frames: this.anims.generateFrameNumbers('sword', { frames: [4, 5, 6, 7] }),
-      frameRate: rate,
-      hideOnComplete: true
-    });
-    this.anims.create({
-      key: 'attack_sword_' + Direction.RIGHT,
-      frames: this.anims.generateFrameNumbers('sword', { frames: [8, 9, 10, 11] }),
-      frameRate: rate,
-      hideOnComplete: true
-    });
-    this.anims.create({
-      key: 'attack_sword_' + Direction.LEFT,
-      frames: this.anims.generateFrameNumbers('sword', { frames: [12, 13, 14, 15] }),
-      frameRate: rate,
-      hideOnComplete: true
-    });
-
-    this.anims.create({
-      key: 'hero1_attack_' + Direction.DOWN,
-      frames: this.anims.generateFrameNumbers('hero1', { frames: [65, 67, 68, 70] }),
-      frameRate: rate
-    });
-    this.anims.create({
-      key: 'hero1_attack_' + Direction.UP,
-      frames: this.anims.generateFrameNumbers('hero1', { frames: [88, 90, 93, 95] }),
-      frameRate: rate
-    });
-    this.anims.create({
-      key: 'hero1_attack_' + Direction.RIGHT,
-      frames: this.anims.generateFrameNumbers('hero1', { frames: [96, 98, 108, 110] }),
-      frameRate: rate
-    });
-    this.anims.create({
-      key: 'hero1_attack_' + Direction.LEFT,
-      frames: this.anims.generateFrameNumbers('hero1', { frames: [121, 123, 117, 119] }),
-      frameRate: rate
-    });
+    preloadPlayerCharacter(this);
+    preloadWeapon(this);
   }
 
   async create() {
@@ -82,8 +41,7 @@ export default class MainScene extends Phaser.Scene {
     const terrainLayer = this.map.createLayer(0, terrain, 0, 0);
 
     this.player = new PlayerCharacter(this, Phaser.Math.Between(0, 4), Phaser.Math.Between(0, 4), "hero1", "me");
-    this.sword = this.add.sprite(this.player.getCenter().x, this.player.getCenter().y, 'sword', 0)
-      .setVisible(false);
+    this.sword = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me').setVisible(false);
 
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
@@ -106,6 +64,43 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.ignore([this.fpsText, hud]);
 
     this.connection = await this.openWebSocket();
+
+    this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(value => {
+      // we only care about ourselves
+      if (value.charId !== "me") return;
+      let builder = new Builder(1024);
+
+      MoveCommand.startMoveCommand(builder);
+      MoveCommand.addPos(builder, Vec3.createVec3(builder, value.enterTile.x, value.enterTile.y, 0));
+      const movement = MoveCommand.endMoveCommand(builder);
+
+      Command.startCommand(builder);
+      Command.addSeq(builder, 0); // TODO: add sequence number
+      Command.addActionType(builder, Action.MoveCommand);
+      Command.addAction(builder, movement);
+      const update = Command.endCommand(builder);
+      builder.finish(update);
+      this.connection.send(builder.asUint8Array());
+    });
+
+    // Player Animations on movement
+    this.player.anims.play('hero1_stand_' + this.gridEngine.getFacingDirection('me'));
+    this.gridEngine.movementStarted().subscribe(({ charId, direction }) => {
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
+      sprite.anims.play(sprite.getWalkAnimation(direction));
+    });
+
+    this.gridEngine.movementStopped().subscribe(({ charId, direction }) => {
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
+      sprite.anims.stop();
+      sprite.setFrame(sprite.getStopFrame(direction));
+      sprite.anims.play(sprite.getStandAnimation(direction));
+    });
+
+    this.gridEngine.directionChanged().subscribe(({ charId, direction }) => {
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
+      sprite.setFrame(sprite.getStopFrame(direction));
+    });
   }
 
   update() {
@@ -148,24 +143,6 @@ export default class MainScene extends Phaser.Scene {
       const update = Command.endCommand(builder);
       builder.finish(update);
       ws.send(builder.asUint8Array());
-
-      this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(value => {
-        // we only care about ourselves
-        if (value.charId !== "me") return;
-        let builder = new Builder(1024);
-
-        MoveCommand.startMoveCommand(builder);
-        MoveCommand.addPos(builder, Vec3.createVec3(builder, value.enterTile.x, value.enterTile.y, 0));
-        const movement = MoveCommand.endMoveCommand(builder);
-
-        Command.startCommand(builder);
-        Command.addSeq(builder, 0); // TODO: add sequence number
-        Command.addActionType(builder, Action.MoveCommand);
-        Command.addAction(builder, movement);
-        const update = Command.endCommand(builder);
-        builder.finish(update);
-        ws.send(builder.asUint8Array());
-      });
     });
     ws.addEventListener('message', async (msg: MessageEvent) => {
       const data: ArrayBuffer = await (msg.data as Blob).arrayBuffer();
@@ -195,12 +172,15 @@ export default class MainScene extends Phaser.Scene {
             const attack: AttackEvent = update.events(i, new AttackEvent());
 
             const key = attack.key().toString();
-            const otherPlayer = this.gridEngine.getSprite(key);
-            const direction = this.getNormalisedFacingDirection(key);
-            const sword = this.add.sprite(otherPlayer.getCenter().x, otherPlayer.getCenter().y, key + '_sword', 0);
+            const direction = Directions[attack.facing()];
+            const otherPlayer = this.gridEngine.getSprite(key) as PlayerCharacter;
+            this.gridEngine.turnTowards(key, direction);
+
+            // TODO: only add a new weapon if there isn't one for this player already
+            const sword = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
             this.interfaceCamera.ignore(sword);
-            sword.play('attack_sword_' + direction);
-            otherPlayer.play('hero1_attack_' + direction);
+            sword.play(sword.getAttackAnimation(direction));
+            otherPlayer.play(otherPlayer.getAttackAnimation(direction));
 
             break;
           }
@@ -224,6 +204,7 @@ export default class MainScene extends Phaser.Scene {
       const pc = new PlayerCharacter(this, position.x(), position.y(), texture, key);
       pc.setData("name", name);
       this.gridEngine.addCharacter(pc.gridEngineCharacterData);
+      pc.play(pc.getStandAnimation(this.gridEngine.getFacingDirection(key)));
       this.interfaceCamera.ignore(pc);
     } else {
       this.gridEngine.moveTo(key, { x: position.x(), y: position.y() });
@@ -236,17 +217,17 @@ export default class MainScene extends Phaser.Scene {
       return;
     }
 
-    const direction = this.getNormalisedFacingDirection('me');
+    const facing = this.gridEngine.getFacingDirection('me');
 
     this.sword
       .setVisible(true)
       .setPosition(this.player.getCenter().x, this.player.getCenter().y)
-      .play('attack_sword_' + direction);
+      .play(this.sword.getAttackAnimation(facing));
 
-    this.player.play('hero1_attack_' + direction);
+    this.player.play(this.player.getAttackAnimation(facing));
 
     let builder = new Builder(1024);
-    const attack = AttackCommand.createAttackCommand(builder);
+    const attack = AttackCommand.createAttackCommand(builder, Directions.indexOf(facing));
     Command.startCommand(builder);
     Command.addSeq(builder, 0); // TODO: add sequence number
     Command.addActionType(builder, Action.AttackCommand);
@@ -257,22 +238,18 @@ export default class MainScene extends Phaser.Scene {
   }
 
   applyDefaultAction() {
-    // Apply a very basic rate limited based on ohw long it takes for animations to complete
-    // not perfect but this should be done by the server anyway
-    if (this.player.anims.isPlaying) return;
-
     // TODO: depending on what we have selected we might choose to do something different
     // than just plain attacking
-    const tile = this.map.getTileAt(this.gridEngine.getFacingPosition('me').x, this.gridEngine.getFacingPosition('me').y);
+    const lookingAtPosition = this.gridEngine.getFacingPosition('me');
+    const tile = this.map.getTileAt(lookingAtPosition.x, lookingAtPosition.y);
     // TODO: if we are facing something interesting
-    this.submitAttack();
+
+    if (this.player.canAttack) {
+      this.player.canAttack = false;
+      this.time.delayedCall(500, () => { this.player.canAttack = true });
+      this.submitAttack();
+    }
   }
 
-  getNormalisedFacingDirection(charId: string) {
-    let direction = this.gridEngine.getFacingDirection(charId);
-    if (direction == Direction.DOWN_LEFT || direction == Direction.UP_LEFT) direction = Direction.LEFT;
-    if (direction == Direction.DOWN_RIGHT || direction == Direction.UP_RIGHT) direction = Direction.RIGHT;
-    return direction;
-  }
 }
 

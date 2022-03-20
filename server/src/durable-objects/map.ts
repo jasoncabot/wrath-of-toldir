@@ -11,8 +11,8 @@ type PlayerId = string
 
 interface Connection {
     socket: WebSocket
-    ready: boolean
     quitting: boolean
+    player: Player | undefined
 }
 
 interface Player {
@@ -32,18 +32,16 @@ interface ReceivedCommand {
 }
 
 export class Map implements DurableObject {
-    players: Record<PlayerId, Connection>;
+    connections: Record<PlayerId, Connection>;
     intervalHandle: number;
     commandQueue: ReceivedCommand[];
-    joinedPlayers: Record<PlayerId, Player>;
 
     constructor(private readonly state: DurableObjectState, private readonly env: Bindings) {
         this.state = state;
         this.env = env;
 
-        this.players = {};
+        this.connections = {};
         this.commandQueue = [];
-        this.joinedPlayers = {};
 
         // Well this is our main game loop
         this.intervalHandle = setInterval(this.onGameTick.bind(this), 500);
@@ -119,24 +117,27 @@ export class Map implements DurableObject {
                     const move: MoveCommand = command.action(new MoveCommand());
 
                     // update game state
-                    const pos = this.joinedPlayers[playerId].position;
+                    const pos = this.connections[playerId].player?.position;
+                    if (!pos) {
+                        console.log("No position found for player with id " + playerId);
+                        return;
+                    }
                     pos.x = move.pos()?.x() || 0;
                     pos.y = move.pos()?.y() || 0;
                     pos.z = move.pos()?.z() || 0;
 
                     // inform other players
-                    const players: PlayerId[] = Object.keys(this.players); // canObserve(playerId, move);
+                    const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
                     players.forEach(otherPlayerId => {
                         if (otherPlayerId == playerId) return;
                         const { builder, eventOffsets, eventTypeOffsets } = createEventStore(otherPlayerId);
 
                         MoveEvent.startMoveEvent(builder);
-                        MoveEvent.addKey(builder, this.joinedPlayers[playerId].key);
+                        MoveEvent.addKey(builder, this.connections[playerId].player!.key);
                         MoveEvent.addPos(builder, Vec3.createVec3(builder, pos.x, pos.y, pos.z));
                         eventOffsets.push(MoveEvent.endMoveEvent(builder));
                         eventTypeOffsets.push(Update.MoveEvent);
                     });
-
                     break;
                 }
                 case Action.JoinCommand: {
@@ -145,22 +146,21 @@ export class Map implements DurableObject {
 
                     // update game state
                     const key = Math.floor(Math.random() * 2147483647);
-                    this.joinedPlayers[playerId] = {
-                        key: key,
-                        name: join.name()!,
+                    this.connections[playerId].player = {
+                        key,
+                        name: join.name() || "Unknown",
                         position: { x: join.pos()!.x(), y: join.pos()!.y(), z: join.pos()!.z() }
-                    };
-                    this.players[playerId].ready = true;
+                    }
 
                     // inform other players
                     const joined = createEventStore(playerId);
-                    const players: PlayerId[] = Object.keys(this.players); // canObserve(playerId, move);
+                    const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
                     players.forEach(otherPlayerId => {
                         if (otherPlayerId == playerId) return;
                         const { builder, eventOffsets, eventTypeOffsets } = createEventStore(otherPlayerId);
 
                         // tell the player who joined about other players who are already here
-                        const otherPlayer = this.joinedPlayers[otherPlayerId];
+                        const otherPlayer = this.connections[otherPlayerId].player;
                         if (otherPlayer) {
                             const otherPlayerName = joined.builder.createString(otherPlayer.name);
                             JoinEvent.startJoinEvent(joined.builder);
@@ -185,18 +185,17 @@ export class Map implements DurableObject {
                     // read client action
                     const leave: LeaveEvent = command.action(new LeaveCommand());
 
-                    const player = this.joinedPlayers[playerId];
+                    const player = this.connections[playerId].player;
                     if (!player) {
-                        console.log(`P  layer with id ${playerId} no longer exists in joinedPlayers (len: ${Object.keys(this.joinedPlayers).length}) or players (len: ${Object.keys(this.players).length})`);
+                        console.log(`Player with id ${playerId} no longer exists players.length = ${Object.keys(this.connections).length}`);
                         break;
                     }
 
                     // update game state
-                    delete this.players[playerId];
-                    delete this.joinedPlayers[playerId];
+                    delete this.connections[playerId];
 
                     // inform other players
-                    const players: PlayerId[] = Object.keys(this.players); // canObserve(playerId, move);
+                    const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
                     players.forEach(otherPlayerId => {
                         if (otherPlayerId == playerId) return;
                         const { builder, eventOffsets, eventTypeOffsets } = createEventStore(otherPlayerId);
@@ -213,15 +212,21 @@ export class Map implements DurableObject {
                     const attack: AttackEvent = command.action(new AttackCommand());
 
                     // update game state
+                    const player = this.connections[playerId].player;
+                    if (!player) {
+                        console.log(`Player with id ${playerId} no longer exists players.length = ${Object.keys(this.connections).length}`);
+                        return;
+                    }
 
                     // inform other players
-                    const players: PlayerId[] = Object.keys(this.players); // canObserve(playerId, move);
+                    const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
                     players.forEach(otherPlayerId => {
                         if (otherPlayerId == playerId) return;
                         const { builder, eventOffsets, eventTypeOffsets } = createEventStore(otherPlayerId);
 
                         AttackEvent.startAttackEvent(builder);
-                        AttackEvent.addKey(builder, this.joinedPlayers[playerId].key);
+                        AttackEvent.addKey(builder, player.key);
+                        AttackEvent.addFacing(builder, attack.facing());
                         eventOffsets.push(AttackEvent.endAttackEvent(builder));
                         eventTypeOffsets.push(Update.AttackEvent);
                     });
@@ -232,7 +237,7 @@ export class Map implements DurableObject {
         this.commandQueue = [];
 
         // emit events for affected clients
-        for (const [playerId, player] of Object.entries(this.players)) {
+        for (const [playerId, player] of Object.entries(this.connections)) {
             try {
                 if (player.quitting) {
                     player.socket.close(1011, "WebSocket broken.");
@@ -261,12 +266,12 @@ export class Map implements DurableObject {
     async handleSession(socket: WebSocket, playerId: PlayerId) {
         socket.accept();
 
-        let player = {
+        let connection = {
             socket,
-            ready: false,
-            quitting: false,
+            player: undefined,
+            quitting: false
         };
-        this.players[playerId] = player;
+        this.connections[playerId] = connection;
 
         socket.addEventListener("message", async msg => {
 
@@ -277,8 +282,8 @@ export class Map implements DurableObject {
 
             const action = Command.getRootAsCommand(bb);
 
-            const player = this.players[playerId];
-            if (player.ready && !player.quitting || action.actionType() == Action.JoinCommand) {
+            const { player, quitting } = this.connections[playerId];
+            if (player && !quitting || action.actionType() == Action.JoinCommand) {
                 this.commandQueue.push({ playerId, command: action });
             } else {
                 console.log(`Skipping command ${action.actionType().toString()} from player because they are not ready or quitting`);
@@ -298,8 +303,7 @@ export class Map implements DurableObject {
                 }
             });
 
-            player.quitting = true;
-            player.ready = false;
+            connection.quitting = true;
         };
         socket.addEventListener("close", closeOrErrorHandler);
         socket.addEventListener("error", closeOrErrorHandler);

@@ -2,34 +2,24 @@ import { CharacterData, Direction, GridEngine } from "grid-engine";
 
 export type SpriteTexture = 'hero1'
 
-const walkMapForTexture = (texture: SpriteTexture) => {
-  return {
-    up: {
-      leftFoot: 58,
-      standing: 25,
-      rightFoot: 56,
-    },
-    down: {
-      leftFoot: 32,
-      standing: 1,
-      rightFoot: 34,
-    },
-    left: {
-      leftFoot: 40,
-      standing: 10,
-      rightFoot: 42,
-    },
-    right: {
-      leftFoot: 48,
-      standing: 18,
-      rightFoot: 50,
-    }
+export const normalisedFacingDirection = (direction: Direction) => {
+  switch (direction) {
+    case Direction.NONE: return Direction.NONE;
+    case Direction.LEFT: return Direction.LEFT;
+    case Direction.UP_LEFT: return Direction.LEFT;
+    case Direction.UP: return Direction.UP;
+    case Direction.UP_RIGHT: return Direction.RIGHT;
+    case Direction.RIGHT: return Direction.RIGHT;
+    case Direction.DOWN_RIGHT: return Direction.RIGHT;
+    case Direction.DOWN: return Direction.DOWN;
+    case Direction.DOWN_LEFT: return Direction.LEFT;
   }
 }
 
 export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
   identifier: string;
   gridEngineCharacterData: CharacterData;
+  canAttack: boolean
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: SpriteTexture, identifier: string) {
     super(scene, 0, 0, texture, 0);
@@ -38,14 +28,36 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
       id: identifier,
       sprite: this,
       speed: 2,
-      walkingAnimationMapping: walkMapForTexture(texture),
       startPosition: { x, y },
       collides: {
         collisionGroups: [],
       }
     }
+    this.canAttack = true;
 
     scene.add.existing(this);
+  }
+
+  getStopFrame(direction: Direction): number {
+    switch (normalisedFacingDirection(direction)) {
+      case Direction.LEFT: return 43;
+      case Direction.UP: return 59;
+      case Direction.RIGHT: return 51;
+      case Direction.DOWN: return 35;
+    }
+    return 0;
+  }
+
+  getWalkAnimation(direction: Direction): string {
+    return "hero1_walk_" + normalisedFacingDirection(direction);
+  }
+
+  getStandAnimation(direction: Direction): string {
+    return "hero1_stand_" + normalisedFacingDirection(direction);
+  }
+
+  getAttackAnimation(direction: Direction): string {
+    return "hero1_attack_" + normalisedFacingDirection(direction);
   }
 
   applyMovement(gridEngine: GridEngine, cursors: Phaser.Types.Input.Keyboard.CursorKeys, pointer: Phaser.Input.Pointer): void {
@@ -93,3 +105,88 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
     }
   }
 }
+
+const preloadPlayerCharacter = (scene: Phaser.Scene) => {
+  const rate = 16;
+
+  scene.anims.create({
+    key: 'hero1_attack_' + Direction.DOWN,
+    frames: scene.anims.generateFrameNumbers('hero1', { frames: [65, 67, 68, 70] }),
+    frameRate: rate
+  });
+  scene.anims.create({
+    key: 'hero1_attack_' + Direction.UP,
+    frames: scene.anims.generateFrameNumbers('hero1', { frames: [88, 90, 93, 95] }),
+    frameRate: rate
+  });
+  scene.anims.create({
+    key: 'hero1_attack_' + Direction.RIGHT,
+    frames: scene.anims.generateFrameNumbers('hero1', { frames: [96, 98, 108, 110] }),
+    frameRate: rate
+  });
+  scene.anims.create({
+    key: 'hero1_attack_' + Direction.LEFT,
+    frames: scene.anims.generateFrameNumbers('hero1', { frames: [121, 123, 117, 119] }),
+    frameRate: rate
+  });
+
+  scene.anims.create({
+    key: 'hero1_stand_' + Direction.DOWN,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [0, 1, 2, 3] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+  scene.anims.create({
+    key: 'hero1_stand_' + Direction.LEFT,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [8, 9, 10, 11] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+  scene.anims.create({
+    key: 'hero1_stand_' + Direction.RIGHT,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [16, 17, 18, 19] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+  scene.anims.create({
+    key: 'hero1_stand_' + Direction.UP,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [24, 25, 26, 27] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+
+  scene.anims.create({
+    key: 'hero1_walk_' + Direction.DOWN,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [32, 33, 34, 35] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+  scene.anims.create({
+    key: 'hero1_walk_' + Direction.UP,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [56, 57, 58, 59] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+  scene.anims.create({
+    key: 'hero1_walk_' + Direction.RIGHT,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [48, 49, 50, 51] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+  scene.anims.create({
+    key: 'hero1_walk_' + Direction.LEFT,
+    frames: scene.anims.generateFrameNumbers("hero1", { frames: [40, 41, 42, 43] }),
+    frameRate: 10,
+    repeat: -1,
+    yoyo: true,
+  });
+}
+
+export { preloadPlayerCharacter }

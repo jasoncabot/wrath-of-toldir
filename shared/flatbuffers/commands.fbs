@@ -15,6 +15,7 @@ table LeaveCommand {
 }
 
 table AttackCommand {
+    facing: int8;
 }
 
 union Action {

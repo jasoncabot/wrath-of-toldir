@@ -25,6 +25,7 @@ table LeaveEvent {
 
 table AttackEvent {
     key: int32;
+    facing: int8;
 }
 
 union Update { 
