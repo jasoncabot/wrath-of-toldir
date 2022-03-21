@@ -1,4 +1,5 @@
 import { CharacterData, Direction, GridEngine } from "grid-engine";
+import Weapon from "./weapon";
 
 export type SpriteTexture = 'hero1'
 
@@ -31,7 +32,8 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
       startPosition: { x, y },
       collides: {
         collisionGroups: [],
-      }
+      },
+      facingDirection: Direction.DOWN
     }
     this.canAttack = true;
 
@@ -48,42 +50,55 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
     return 0;
   }
 
-  getWalkAnimation(direction: Direction): string {
-    return "hero1_walk_" + normalisedFacingDirection(direction);
+  playWalkAnimation(direction: Direction) {
+    const anim = "hero1_walk_" + normalisedFacingDirection(direction);
+    return this.play(anim);
   }
 
-  getStandAnimation(direction: Direction): string {
-    return "hero1_stand_" + normalisedFacingDirection(direction);
+  playStandAnimation(direction: Direction) {
+    const anim = "hero1_stand_" + normalisedFacingDirection(direction);
+    return this.play(anim);
   }
 
-  getAttackAnimation(direction: Direction): string {
-    return "hero1_attack_" + normalisedFacingDirection(direction);
+  playAttackAnimation(direction: Direction) {
+    const anim = "hero1_attack_" + normalisedFacingDirection(direction);
+    return this.play(anim).on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.playStandAnimation(direction);
+    });
   }
 
   applyMovement(gridEngine: GridEngine, cursors: Phaser.Types.Input.Keyboard.CursorKeys, pointer: Phaser.Input.Pointer): void {
-    const movement = cursors.shift.isDown ? gridEngine.turnTowards.bind(gridEngine) : gridEngine.move.bind(gridEngine);
+    const moveInDirection = (direction: Direction) => {
+      if (cursors.shift.isDown) {
+        gridEngine.turnTowards(this.identifier, direction);
+        this.setFrame(this.getStopFrame(direction));
+        this.playStandAnimation(direction);
+      } else {
+        gridEngine.move(this.identifier, direction);
+      }
+    }
 
     if (cursors.up.isDown && !cursors.down.isDown) {
       if (cursors.left.isDown && !cursors.right.isDown) {
-        movement(this.identifier, Direction.UP_LEFT);
+        moveInDirection(Direction.UP_LEFT);
       } else if (!cursors.left.isDown && cursors.right.isDown) {
-        movement(this.identifier, Direction.UP_RIGHT);
+        moveInDirection(Direction.UP_RIGHT);
       } else {
-        movement(this.identifier, Direction.UP);
+        moveInDirection(Direction.UP);
       }
     } else if (!cursors.up.isDown && cursors.down.isDown) {
       if (cursors.left.isDown && !cursors.right.isDown) {
-        movement(this.identifier, Direction.DOWN_LEFT);
+        moveInDirection(Direction.DOWN_LEFT);
       } else if (!cursors.left.isDown && cursors.right.isDown) {
-        movement(this.identifier, Direction.DOWN_RIGHT);
+        moveInDirection(Direction.DOWN_RIGHT);
       } else {
-        movement(this.identifier, Direction.DOWN);
+        moveInDirection(Direction.DOWN);
       }
     } else {
       if (cursors.left.isDown && !cursors.right.isDown) {
-        movement(this.identifier, Direction.LEFT);
+        moveInDirection(Direction.LEFT);
       } else if (!cursors.left.isDown && cursors.right.isDown) {
-        movement(this.identifier, Direction.RIGHT);
+        moveInDirection(Direction.RIGHT);
       }
     }
 
@@ -101,7 +116,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
       if (angleToPointer >= 1.1780972451) direction = Direction.UP;
       if (angleToPointer >= 1.96349540849) direction = Direction.UP_RIGHT;
 
-      movement(this.identifier, direction);
+      moveInDirection(direction);
     }
   }
 }

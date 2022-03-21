@@ -10,6 +10,7 @@ import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
 import { normalisedFacingDirection, preloadPlayerCharacter, SpriteTexture } from '../objects/playerCharacter';
 import Weapon, { preloadWeapon } from '../objects/weapon';
+import { backOff } from "exponential-backoff";
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -23,9 +24,12 @@ export default class MainScene extends Phaser.Scene {
   onPositionChangedSubscription: any;
   sword: Weapon;
   connection: WebSocket;
+  commandSequencer: number
 
   constructor() {
     super({ key: 'MainScene' });
+
+    this.commandSequencer = 0;
   }
 
   preload() {
@@ -63,7 +67,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.cameras.main.ignore([this.fpsText, hud]);
 
-    this.connection = await this.openWebSocket();
+    await this.reconnect();
 
     this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(value => {
       // we only care about ourselves
@@ -75,7 +79,7 @@ export default class MainScene extends Phaser.Scene {
       const movement = MoveCommand.endMoveCommand(builder);
 
       Command.startCommand(builder);
-      Command.addSeq(builder, 0); // TODO: add sequence number
+      Command.addSeq(builder, ++this.commandSequencer);
       Command.addActionType(builder, Action.MoveCommand);
       Command.addAction(builder, movement);
       const update = Command.endCommand(builder);
@@ -84,28 +88,24 @@ export default class MainScene extends Phaser.Scene {
     });
 
     // Player Animations on movement
-    this.player.anims.play('hero1_stand_' + this.gridEngine.getFacingDirection('me'));
+    this.player.playStandAnimation(this.gridEngine.getFacingDirection('me'));
     this.gridEngine.movementStarted().subscribe(({ charId, direction }) => {
       const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
-      sprite.anims.play(sprite.getWalkAnimation(direction));
+      sprite.playWalkAnimation(direction);
     });
 
     this.gridEngine.movementStopped().subscribe(({ charId, direction }) => {
       const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
       sprite.anims.stop();
       sprite.setFrame(sprite.getStopFrame(direction));
-      sprite.anims.play(sprite.getStandAnimation(direction));
-    });
-
-    this.gridEngine.directionChanged().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
-      sprite.setFrame(sprite.getStopFrame(direction));
+      sprite.playStandAnimation(direction);
     });
   }
 
   update() {
     this.fpsText.update();
     this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
+    if (this.sword.visible) this.sword.setPosition(this.player.getCenter().x, this.player.getCenter().y);
 
     if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
       this.applyDefaultAction();
@@ -113,31 +113,28 @@ export default class MainScene extends Phaser.Scene {
   }
 
   async openWebSocket() {
-
     // GET /api/map/name
     // to get an auth token to open a websocket
 
-    let socketHostname = location.hostname;
-    if (socketHostname == 'localhost') socketHostname = '127.0.0.1';
-
-    const socketHost = `ws://${socketHostname}:8787`;
     const mapId = "fairweather";
+    const wsURI = `${process.env.WS_URI}/api/map/${mapId}/connection`;
+    console.log(`Connecting ${wsURI} ...`);
 
-    let ws = new WebSocket(`${socketHost}/api/map/${mapId}/connection`);
+    let ws = new WebSocket(wsURI);
     ws.addEventListener("open", (event: Event) => {
       let builder = new Builder(1024);
 
       const { x, y } = this.gridEngine.getPosition("me");
       const z = parseInt(this.gridEngine.getCharLayer("me"), 10);
 
-      const name = builder.createString(uuidv4());
-      JoinCommand.startJoinCommand(builder);
-      JoinCommand.addName(builder, name);
-      JoinCommand.addPos(builder, Vec3.createVec3(builder, x, y, z));
-      const join = JoinCommand.endJoinCommand(builder);
+      const name = uuidv4();
+      const nameOffset = builder.createString(name);
+      const join = JoinCommand.createJoinCommand(builder,
+        Vec3.createVec3(builder, x, y, z),
+        nameOffset);
 
       Command.startCommand(builder);
-      Command.addSeq(builder, 0); // TODO: add sequence number
+      Command.addSeq(builder, ++this.commandSequencer);
       Command.addActionType(builder, Action.JoinCommand);
       Command.addAction(builder, join);
       const update = Command.endCommand(builder);
@@ -179,8 +176,8 @@ export default class MainScene extends Phaser.Scene {
             // TODO: only add a new weapon if there isn't one for this player already
             const sword = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
             this.interfaceCamera.ignore(sword);
-            sword.play(sword.getAttackAnimation(direction));
-            otherPlayer.play(otherPlayer.getAttackAnimation(direction));
+            sword.playAttackAnimation(direction);
+            otherPlayer.playAttackAnimation(direction);
 
             break;
           }
@@ -189,13 +186,17 @@ export default class MainScene extends Phaser.Scene {
     });
 
     let closeOrErrorHandler = (event: CloseEvent | MessageEvent | Event) => {
-      console.error("Server connection has dropped " + event);
-      // TODO: we could re-connect?
+      console.error("Server connection has dropped");
+      backOff(this.reconnect.bind(this), { jitter: 'full' });
     };
     ws.addEventListener("close", closeOrErrorHandler);
     ws.addEventListener("error", closeOrErrorHandler);
 
     return ws;
+  }
+
+  async reconnect() {
+    this.connection = await this.openWebSocket()
   }
 
   addOrMoveCharacter(key: string, texture: SpriteTexture, position: Vec3, name: string | null) {
@@ -204,7 +205,7 @@ export default class MainScene extends Phaser.Scene {
       const pc = new PlayerCharacter(this, position.x(), position.y(), texture, key);
       pc.setData("name", name);
       this.gridEngine.addCharacter(pc.gridEngineCharacterData);
-      pc.play(pc.getStandAnimation(this.gridEngine.getFacingDirection(key)));
+      pc.playStandAnimation(this.gridEngine.getFacingDirection(key));
       this.interfaceCamera.ignore(pc);
     } else {
       this.gridEngine.moveTo(key, { x: position.x(), y: position.y() });
@@ -212,24 +213,18 @@ export default class MainScene extends Phaser.Scene {
   }
 
   submitAttack() {
-    if (this.gridEngine.isMoving('me')) {
-      console.log("Can't attack whilst moving");
-      return;
-    }
-
     const facing = this.gridEngine.getFacingDirection('me');
 
     this.sword
       .setVisible(true)
       .setPosition(this.player.getCenter().x, this.player.getCenter().y)
-      .play(this.sword.getAttackAnimation(facing));
-
-    this.player.play(this.player.getAttackAnimation(facing));
+      .playAttackAnimation(facing);
+    this.player.playAttackAnimation(facing);
 
     let builder = new Builder(1024);
     const attack = AttackCommand.createAttackCommand(builder, Directions.indexOf(facing));
     Command.startCommand(builder);
-    Command.addSeq(builder, 0); // TODO: add sequence number
+    Command.addSeq(builder, ++this.commandSequencer);
     Command.addActionType(builder, Action.AttackCommand);
     Command.addAction(builder, attack);
     const update = Command.endCommand(builder);

@@ -1,6 +1,7 @@
 const path = require('path')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
+const Dotenv = require('dotenv-webpack');
 
 module.exports = {
   entry: ['./src/scripts/game.ts', './webpack/credits.js'],
@@ -28,6 +29,10 @@ module.exports = {
     }
   },
   plugins: [
+    new Dotenv({ 
+      safe: true,
+      systemvars: true
+    }),
     new HtmlWebpackPlugin({ gameName: 'Play Wrath of Toldir', template: 'src/index.html' }),
     new CopyWebpackPlugin({
       patterns: [

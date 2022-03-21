@@ -10,8 +10,8 @@ export default class Weapon extends Phaser.Physics.Arcade.Sprite {
         scene.add.existing(this);
     }
 
-    getAttackAnimation(direction: Direction): string {
-        return "attack_sword_" + normalisedFacingDirection(direction);;
+    playAttackAnimation(direction: Direction) {
+        this.play("attack_sword_" + normalisedFacingDirection(direction));
     }
 }
 

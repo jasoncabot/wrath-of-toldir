@@ -28,3 +28,9 @@ durable_objects_persist = true
 [[migrations]]
 tag = "v1"
 new_classes = ["Map"]
+
+[vars]
+FRONTEND_URI="http://localhost:8080"
+
+[env.production]
+vars = { FRONTEND_URI = "https://wot.jasoncabot.com" }
