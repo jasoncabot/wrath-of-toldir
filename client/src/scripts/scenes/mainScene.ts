@@ -187,7 +187,7 @@ export default class MainScene extends Phaser.Scene {
 
     let closeOrErrorHandler = (event: CloseEvent | MessageEvent | Event) => {
       console.error("Server connection has dropped");
-      backOff(this.reconnect.bind(this), { jitter: 'full' });
+      // backOff(this.reconnect.bind(this), { jitter: 'full' });
     };
     ws.addEventListener("close", closeOrErrorHandler);
     ws.addEventListener("error", closeOrErrorHandler);
