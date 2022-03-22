@@ -7,7 +7,6 @@ table MoveCommand {
 }
 
 table JoinCommand {
-    pos: Vec3;
     name: string;
 }
 

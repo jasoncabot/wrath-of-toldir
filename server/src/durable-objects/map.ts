@@ -4,6 +4,7 @@ import { JoinEvent, LeaveEvent, MoveEvent, Update, Vec3 } from "@/models/events"
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Action, AttackCommand, JoinCommand, LeaveCommand, MoveCommand } from "@/models/commands";
 import { AttackEvent } from "@/models/wrath-of-toldir/events/attack-event";
+import maps from "@/handlers/maps";
 
 export type MapAction = 'store-key' | 'websocket';
 
@@ -142,10 +143,14 @@ export class Map implements DurableObject {
                     const join: JoinCommand = command.action(new JoinCommand());
 
                     // update game state
+                    const map = {
+                        width: 40,
+                        height: 40
+                    }
                     player = {
                         key: Math.floor(Math.random() * 2147483647),
                         name: join.name()!,
-                        position: { x: join.pos()!.x(), y: join.pos()!.y(), z: join.pos()!.z() }
+                        position: { x: Math.floor(Math.random() * map.width), y: Math.floor(Math.random() * map.height), z: 0 }
                     };
                     this.connections[playerId].player = player;
 

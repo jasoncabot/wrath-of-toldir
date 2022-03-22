@@ -132,9 +132,7 @@ export default class MainScene extends Phaser.Scene {
 
       const name = uuidv4();
       const nameOffset = builder.createString(name);
-      const join = JoinCommand.createJoinCommand(builder,
-        Vec3.createVec3(builder, x, y, z),
-        nameOffset);
+      const join = JoinCommand.createJoinCommand(builder, nameOffset);
 
       Command.startCommand(builder);
       Command.addSeq(builder, ++this.commandSequencer);

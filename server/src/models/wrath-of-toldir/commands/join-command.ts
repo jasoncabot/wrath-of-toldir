@@ -2,9 +2,6 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { Vec3 } from '../../wrath-of-toldir/vec3';
-
-
 export class JoinCommand {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -23,28 +20,19 @@ static getSizePrefixedRootAsJoinCommand(bb:flatbuffers.ByteBuffer, obj?:JoinComm
   return (obj || new JoinCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-pos(obj?:Vec3):Vec3|null {
-  const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? (obj || new Vec3()).__init(this.bb_pos + offset, this.bb!) : null;
-}
-
 name():string|null
 name(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 name(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
 static startJoinCommand(builder:flatbuffers.Builder) {
-  builder.startObject(2);
-}
-
-static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(0, posOffset, 0);
+  builder.startObject(1);
 }
 
 static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, nameOffset, 0);
+  builder.addFieldOffset(0, nameOffset, 0);
 }
 
 static endJoinCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -52,9 +40,8 @@ static endJoinCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createJoinCommand(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset, nameOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createJoinCommand(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset):flatbuffers.Offset {
   JoinCommand.startJoinCommand(builder);
-  JoinCommand.addPos(builder, posOffset);
   JoinCommand.addName(builder, nameOffset);
   return JoinCommand.endJoinCommand(builder);
 }
