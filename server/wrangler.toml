@@ -1,4 +1,4 @@
-name = "wrath-of-toldir-server"
+name = "wrath-of-toldir-server-dev"
 type = "javascript"
 
 account_id = ""
@@ -33,4 +33,14 @@ new_classes = ["Map"]
 FRONTEND_URI="http://localhost:8080"
 
 [env.production]
+name = "wrath-of-toldir-server"
 vars = { FRONTEND_URI = "https://wot.jasoncabot.com" }
+
+[env.production.durable_objects]
+bindings = [
+  { name = "MAP", class_name = "Map" }
+]
+
+[[env.production.migrations]]
+tag = "v1"
+new_classes = ["Map"]
