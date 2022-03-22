@@ -909,6 +909,11 @@
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.7.tgz#1d572bfbbe14b7704e0ba0f39b74815b84870d70"
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
+"@gamestdio/websocket@^0.3.2":
+  version "0.3.2"
+  resolved "https://registry.yarnpkg.com/@gamestdio/websocket/-/websocket-0.3.2.tgz#321ba0976ee30fd14e51dbf8faa85ce7b325f76a"
+  integrity sha512-J3n5SKim+ZoLbe44hRGI/VYAwSMCeIJuBy+FfP6EZaujEpNchPRFcIsVQLWAwpU1bP2Ji63rC+rEUOd1vjUB6Q==
+
 "@javascript-obfuscator/escodegen@2.3.0":
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/@javascript-obfuscator/escodegen/-/escodegen-2.3.0.tgz#ff7eb7f8a7c004532e93b14ae8b2196dcf9a1a9e"
@@ -2409,11 +2414,6 @@ execa@^5.0.0:
     onetime "^5.1.2"
     signal-exit "^3.0.3"
     strip-final-newline "^2.0.0"
-
-exponential-backoff@^3.1.0:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/exponential-backoff/-/exponential-backoff-3.1.0.tgz#9409c7e579131f8bd4b32d7d8094a911040f2e68"
-  integrity sha512-oBuz5SYz5zzyuHINoe9ooePwSu0xApKWgeNzok4hZ5YKXFh9zrQBEM15CXqoZkJJPuI2ArvqjPQd8UKJA753XA==
 
 express@^4.17.1:
   version "4.17.3"

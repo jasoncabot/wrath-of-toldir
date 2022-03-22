@@ -8,9 +8,9 @@ import { MoveCommand, JoinCommand, LeaveCommand, Action, Vec3 } from '../../mode
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
-import { normalisedFacingDirection, preloadPlayerCharacter, SpriteTexture } from '../objects/playerCharacter';
+import { preloadPlayerCharacter, SpriteTexture } from '../objects/playerCharacter';
 import Weapon, { preloadWeapon } from '../objects/weapon';
-import { backOff } from "exponential-backoff";
+import WebSocketClient from '@gamestdio/websocket';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -23,7 +23,7 @@ export default class MainScene extends Phaser.Scene {
   interfaceCamera: Phaser.Cameras.Scene2D.Camera;
   onPositionChangedSubscription: any;
   sword: Weapon;
-  connection: WebSocket;
+  connection: WebSocketClient;
   commandSequencer: number
 
   constructor() {
@@ -120,8 +120,11 @@ export default class MainScene extends Phaser.Scene {
     const wsURI = `${process.env.WS_URI}/api/map/${mapId}/connection`;
     console.log(`Connecting ${wsURI} ...`);
 
-    let ws = new WebSocket(wsURI);
-    ws.addEventListener("open", (event: Event) => {
+    const ws = new WebSocketClient(wsURI, [], {
+      backoff: "exponential",
+      initialDelay: 1
+    });
+    ws.onopen = (event: Event) => {
       let builder = new Builder(1024);
 
       const { x, y } = this.gridEngine.getPosition("me");
@@ -140,57 +143,27 @@ export default class MainScene extends Phaser.Scene {
       const update = Command.endCommand(builder);
       builder.finish(update);
       ws.send(builder.asUint8Array());
-    });
-    ws.addEventListener('message', async (msg: MessageEvent) => {
+    };
+    ws.onmessage = async (msg: MessageEvent) => {
       const data: ArrayBuffer = await (msg.data as Blob).arrayBuffer();
       let bb = new ByteBuffer(new Uint8Array(data));
 
-      const update = EventLog.getRootAsEventLog(bb);
-
-      for (let i = 0; i < update.eventsLength(); i++) {
-        switch (update.eventsType(i)) {
-          case Update.MoveEvent: {
-            const move: MoveEvent = update.events(i, new MoveEvent());
-            this.addOrMoveCharacter(move.key().toString(), "hero1", move.pos()!, null);
-            break;
-          }
-          case Update.JoinEvent: {
-            const join: JoinEvent = update.events(i, new JoinEvent());
-            this.addOrMoveCharacter(join.key().toString(), "hero1", join.pos()!, join.name());
-            break;
-          }
-          case Update.LeaveEvent: {
-            const leave: LeaveEvent = update.events(i, new LeaveEvent());
-            this.gridEngine.getSprite(leave.key().toString()).destroy();
-            this.gridEngine.removeCharacter(leave.key().toString());
-            break;
-          }
-          case Update.AttackEvent: {
-            const attack: AttackEvent = update.events(i, new AttackEvent());
-
-            const key = attack.key().toString();
-            const direction = Directions[attack.facing()];
-            const otherPlayer = this.gridEngine.getSprite(key) as PlayerCharacter;
-            this.gridEngine.turnTowards(key, direction);
-
-            // TODO: only add a new weapon if there isn't one for this player already
-            const sword = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
-            this.interfaceCamera.ignore(sword);
-            sword.playAttackAnimation(direction);
-            otherPlayer.playAttackAnimation(direction);
-
-            break;
-          }
-        }
-      }
-    });
-
-    let closeOrErrorHandler = (event: CloseEvent | MessageEvent | Event) => {
-      console.error("Server connection has dropped");
-      // backOff(this.reconnect.bind(this), { jitter: 'full' });
+      this.applyUpdate(EventLog.getRootAsEventLog(bb));
     };
-    ws.addEventListener("close", closeOrErrorHandler);
-    ws.addEventListener("error", closeOrErrorHandler);
+    ws.onclose = (event: CloseEvent) => {
+      console.log("Connection closed. Removing old sprites ...");
+      this.children.list.filter(child => {
+        if (child instanceof PlayerCharacter && child != this.player) return true;
+        if (child instanceof Weapon && child != this.sword) return true;
+        return false;
+      }).forEach(x => x.destroy());
+    };
+    ws.onerror = (event: Event) => {
+      console.error("Connection error.");
+    };
+    ws.onreconnect = (event: Event) => {
+      console.log("Connection lost. Re-connecting ...");
+    }
 
     return ws;
   }
@@ -246,5 +219,46 @@ export default class MainScene extends Phaser.Scene {
     }
   }
 
+  applyUpdate(update: EventLog) {
+    for (let i = 0; i < update.eventsLength(); i++) {
+      switch (update.eventsType(i)) {
+        case Update.MoveEvent: {
+          const move: MoveEvent = update.events(i, new MoveEvent());
+          this.addOrMoveCharacter(move.key().toString(), "hero1", move.pos()!, null);
+          break;
+        }
+        case Update.JoinEvent: {
+          const join: JoinEvent = update.events(i, new JoinEvent());
+          this.addOrMoveCharacter(join.key().toString(), "hero1", join.pos()!, join.name());
+          break;
+        }
+        case Update.LeaveEvent: {
+          const leave: LeaveEvent = update.events(i, new LeaveEvent());
+          this.gridEngine.getSprite(leave.key().toString()).destroy();
+          this.gridEngine.removeCharacter(leave.key().toString());
+          break;
+        }
+        case Update.AttackEvent: {
+          const attack: AttackEvent = update.events(i, new AttackEvent());
+
+          const key = attack.key().toString();
+          const direction = Directions[attack.facing()];
+          const otherPlayer = this.gridEngine.getSprite(key) as PlayerCharacter;
+          this.gridEngine.turnTowards(key, direction);
+
+          // TODO: only add a new weapon if there isn't one for this player already
+          const sword = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
+          this.interfaceCamera.ignore(sword);
+          sword.playAttackAnimation(direction);
+          otherPlayer.playAttackAnimation(direction);
+
+          break;
+        }
+      }
+    }
+  }
+
 }
+
+
 

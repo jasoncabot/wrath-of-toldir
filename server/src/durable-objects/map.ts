@@ -111,7 +111,6 @@ export class Map implements DurableObject {
         this.commandQueue.forEach(({ playerId, command }) => {
             console.log(`Processing ${Action[command.actionType()]} (seq: ${command.seq()}) from ${playerId}`);
 
-
             let player = this.connections[playerId].player;
             if (!player && command.actionType() !== Action.JoinCommand) {
                 console.log(`Player with id ${playerId} does not exist players.length = ${Object.keys(this.connections).length}`);
@@ -125,9 +124,9 @@ export class Map implements DurableObject {
 
                     // update game state
                     const pos = player!.position;
-                    pos.x = move.pos()?.x() || 0;
-                    pos.y = move.pos()?.y() || 0;
-                    pos.z = move.pos()?.z() || 0;
+                    pos.x = move.pos()!.x();
+                    pos.y = move.pos()!.y();
+                    pos.z = move.pos()!.z();
 
                     // inform other players
                     const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
@@ -193,7 +192,7 @@ export class Map implements DurableObject {
 
                     if (Object.keys(this.connections).length === 0) {
                         // no one is connected, no point to carry on ticking
-                        console.log('No players are connected, shutting down game tick ...');
+                        console.log('No players are connected, shutting down game tick...');
                         clearInterval(this.intervalHandle);
                         this.intervalHandle = 0;
                     } else {
@@ -303,12 +302,11 @@ export class Map implements DurableObject {
             this.commandQueue.push({
                 playerId,
                 command: {
-                    seq: () => 0,
+                    seq: () => -1,
                     actionType: () => Action.LeaveCommand,
                     action: (_o: any) => new LeaveCommand()
                 }
             });
-
             connection.quitting = true;
         };
         socket.addEventListener("close", closeOrErrorHandler);

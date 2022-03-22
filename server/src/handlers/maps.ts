@@ -25,7 +25,8 @@ const connect = async (request: RequestWithUser, env: Bindings, ctx: ExecutionCo
     let obj = env.MAP.get(id);
     return obj.fetch(durableObjectAction('websocket'), {
         headers: {
-            "X-PlayerId": request.user.id
+            "X-PlayerId": request.user.id,
+            "Upgrade": "websocket"
         }
     });
 }
