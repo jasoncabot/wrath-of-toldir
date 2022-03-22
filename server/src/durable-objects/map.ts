@@ -12,7 +12,7 @@ type PlayerId = string
 interface Connection {
     socket: WebSocket
     quitting: boolean
-    player: Player | undefined
+    player: Player | undefined // set after a player has 'joined' this connection
 }
 
 interface Player {
@@ -21,15 +21,9 @@ interface Player {
     position: { x: number, y: number, z: number }
 }
 
-interface ICommand {
-    seq(): number
-    actionType(): Action;
-    action(command: any): any;
-}
-
 interface ReceivedCommand {
     playerId: PlayerId,
-    command: ICommand
+    command: Command
 }
 
 export class Map implements DurableObject {
@@ -43,6 +37,7 @@ export class Map implements DurableObject {
 
         this.connections = {};
         this.commandQueue = [];
+        this.intervalHandle = 0;
     }
 
     async fetch(request: Request) {
@@ -174,6 +169,7 @@ export class Map implements DurableObject {
                         }
 
                         const nameOffset = builder.createString(player!.name);
+
                         JoinEvent.startJoinEvent(builder);
                         JoinEvent.addKey(builder, player!.key);
                         JoinEvent.addName(builder, nameOffset);
@@ -288,7 +284,7 @@ export class Map implements DurableObject {
 
             const { player, quitting } = this.connections[playerId];
             if ((player && !quitting) || action.actionType() == Action.JoinCommand) {
-                this.commandQueue.push({ playerId, command: action });
+                this.addCommandFromPlayer(playerId, action);
             } else {
                 console.log(`Skipping command ${Action[action.actionType()]} from player ${playerId} because they are not ready or quitting`);
             }
@@ -299,18 +295,23 @@ export class Map implements DurableObject {
         let closeOrErrorHandler = (event: CloseEvent | MessageEvent | Event) => {
             // since the server can detect when a socket is closed rather than our clients
             // use this to inform other players we've left, using the LeaveCommand/LeaveEvent methodology
-            this.commandQueue.push({
-                playerId,
-                command: {
-                    seq: () => -1,
-                    actionType: () => Action.LeaveCommand,
-                    action: (_o: any) => new LeaveCommand()
-                }
-            });
+            const leaveBuilder = new Builder(32);
+            const actionOffset = LeaveCommand.createLeaveCommand(leaveBuilder);
+            const commandOffset = Command.createCommand(leaveBuilder, -1, Action.LeaveCommand, actionOffset);
+            leaveBuilder.finish(commandOffset);
+            this.addCommandFromPlayer(playerId, Command.getRootAsCommand(leaveBuilder.dataBuffer()));
             connection.quitting = true;
         };
         socket.addEventListener("close", closeOrErrorHandler);
         socket.addEventListener("error", closeOrErrorHandler);
+    }
+
+    addCommandFromPlayer(playerId: string, command: Command) {
+        // TODO: should we keep this sorted, so that when the game ticks, we process all moves in the same way (e.g by type?)
+        // This way, would all joins get processed, then moves, then attacks
+        // positive is we group all actions that happen, regardless of time, into the same 'tick bucket' e.g 500ms
+        // negatives is complexity of having to keep this sorted when we fan out from 1 command to n events
+        this.commandQueue.push({ playerId, command });
     }
 
     async handleErrors(request: Request, func: () => Promise<Response>) {
