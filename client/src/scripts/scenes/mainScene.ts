@@ -4,15 +4,37 @@ import { FpsText, PlayerCharacter } from '../objects/'
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
 import { AttackEvent, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
-import { MoveCommand, JoinCommand, LeaveCommand, Action, Vec3 } from '../../models/commands';
+import { MoveCommand, JoinCommand, Action, Vec3 } from '../../models/commands';
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
 import { preloadPlayerCharacter, SpriteTexture } from '../objects/playerCharacter';
 import Weapon, { preloadWeapon } from '../objects/weapon';
 import WebSocketClient from '@gamestdio/websocket';
+import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
+import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
+import { MapLayer } from '../../models/maps';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
+
+
+/**
+ * The state of the user interface for this particular map
+ */
+enum MapSceneState {
+  /**
+   * Scene is being / has been created, controls and cameras added but no data
+   */
+  INITIAL,
+  /**
+   * Server connection has been established and we have told the server who we are
+   */
+  JOINED,
+  /**
+   * Server has sent us all the data required for display - let's rock'n'roll
+   */
+  READY
+}
 
 export default class MainScene extends Phaser.Scene {
   fpsText: FpsText
@@ -24,7 +46,8 @@ export default class MainScene extends Phaser.Scene {
   onPositionChangedSubscription: any;
   sword: Weapon;
   connection: WebSocketClient;
-  commandSequencer: number
+  commandSequencer: number;
+  currentState = MapSceneState.INITIAL;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -38,77 +61,27 @@ export default class MainScene extends Phaser.Scene {
   }
 
   async create() {
-    const data: number[][] = Array(400).fill(null).map(arr => Array(400).fill(null).map(_ => Phaser.Math.Between(0, 456)));
-
-    this.map = this.make.tilemap({ data, tileWidth: 48, tileHeight: 48, key: "terrain" });
-    const terrain = this.map.addTilesetImage("rural_village_terrain", "rural_village_terrain", 48, 48);
-    const terrainLayer = this.map.createLayer(0, terrain, 0, 0);
-
-    this.player = new PlayerCharacter(this, Phaser.Math.Between(0, 4), Phaser.Math.Between(0, 4), "hero1", "me");
-    this.sword = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me').setVisible(false);
-
-    this.cameras.main.startFollow(this.player, true);
-    this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
-
     this.cursors = this.input.keyboard.createCursorKeys();
-
-    this.gridEngine.create(this.map, {
-      characters: [
-        this.player.gridEngineCharacterData
-      ],
-      numberOfDirections: 8
-    });
-
     this.interfaceCamera = this.cameras.add();
-    this.interfaceCamera.ignore([this.player, terrainLayer, this.sword]);
 
     this.fpsText = new FpsText(this);
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
-
     this.cameras.main.ignore([this.fpsText, hud]);
 
-    await this.reconnect();
-
-    this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(value => {
-      // we only care about ourselves
-      if (value.charId !== "me") return;
-      let builder = new Builder(1024);
-
-      MoveCommand.startMoveCommand(builder);
-      MoveCommand.addPos(builder, Vec3.createVec3(builder, value.enterTile.x, value.enterTile.y, 0));
-      const movement = MoveCommand.endMoveCommand(builder);
-
-      Command.startCommand(builder);
-      Command.addSeq(builder, ++this.commandSequencer);
-      Command.addActionType(builder, Action.MoveCommand);
-      Command.addAction(builder, movement);
-      const update = Command.endCommand(builder);
-      builder.finish(update);
-      this.connection.send(builder.asUint8Array());
-    });
-
-    // Player Animations on movement
-    this.player.playStandAnimation(this.gridEngine.getFacingDirection('me'));
-    this.gridEngine.movementStarted().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
-      sprite.playWalkAnimation(direction);
-    });
-
-    this.gridEngine.movementStopped().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
-      sprite.anims.stop();
-      sprite.setFrame(sprite.getStopFrame(direction));
-      sprite.playStandAnimation(direction);
-    });
+    // Create our connection to the server
+    this.connection = await this.openWebSocket();
   }
 
   update() {
     this.fpsText.update();
-    this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
-    if (this.sword.visible) this.sword.setPosition(this.player.getCenter().x, this.player.getCenter().y);
 
-    if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
-      this.applyDefaultAction();
+    if (this.currentState === MapSceneState.READY) {
+      this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
+      if (this.sword.visible) this.sword.setPosition(this.player.getCenter().x, this.player.getCenter().y);
+
+      if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
+        this.applyDefaultAction();
+      }
     }
   }
 
@@ -127,9 +100,6 @@ export default class MainScene extends Phaser.Scene {
     ws.onopen = (event: Event) => {
       let builder = new Builder(1024);
 
-      const { x, y } = this.gridEngine.getPosition("me");
-      const z = parseInt(this.gridEngine.getCharLayer("me"), 10);
-
       const name = uuidv4();
       const nameOffset = builder.createString(name);
       const join = JoinCommand.createJoinCommand(builder, nameOffset);
@@ -141,6 +111,8 @@ export default class MainScene extends Phaser.Scene {
       const update = Command.endCommand(builder);
       builder.finish(update);
       ws.send(builder.asUint8Array());
+
+      this.currentState = MapSceneState.JOINED;
     };
     ws.onmessage = async (msg: MessageEvent) => {
       const data: ArrayBuffer = await (msg.data as Blob).arrayBuffer();
@@ -150,11 +122,17 @@ export default class MainScene extends Phaser.Scene {
     };
     ws.onclose = (event: CloseEvent) => {
       console.log("Connection closed. Removing old sprites ...");
+      this.map.destroy();
+      this.sword.destroy();
+      this.player.destroy();
+      this.gridEngine.destroy();
+
       this.children.list.filter(child => {
         if (child instanceof PlayerCharacter && child != this.player) return true;
         if (child instanceof Weapon && child != this.sword) return true;
         return false;
       }).forEach(x => x.destroy());
+      this.currentState = MapSceneState.INITIAL;
     };
     ws.onerror = (event: Event) => {
       console.error("Connection error.");
@@ -166,11 +144,8 @@ export default class MainScene extends Phaser.Scene {
     return ws;
   }
 
-  async reconnect() {
-    this.connection = await this.openWebSocket()
-  }
-
   addOrMoveCharacter(key: string, texture: SpriteTexture, position: Vec3, name: string | null) {
+    if (this.currentState !== MapSceneState.READY) return;
     const alreadyAdded = this.gridEngine.hasCharacter(key);
     if (!alreadyAdded) {
       const pc = new PlayerCharacter(this, position.x(), position.y(), texture, key);
@@ -252,8 +227,103 @@ export default class MainScene extends Phaser.Scene {
 
           break;
         }
+        case Update.MapJoinedEvent: {
+          const event: MapJoinedEvent = update.events(i, new MapJoinedEvent());
+
+          this.transitionToReady(event);
+          break;
+        }
       }
     }
+  }
+
+  transitionToReady(event: MapJoinedEvent) {
+    const map: TileMap = event.tilemap()!
+
+    // create our client-side representation of this map
+    this.map = this.make.tilemap({ tileWidth: 48, tileHeight: 48, width: map.width()!, height: map.height()! });
+
+    // Create the images that are displayed for each layer of our map
+    // This is the first thing we expect to get after joining a game
+    const terrain = this.map.addTilesetImage("rural_village_terrain");
+
+    // create the data for every layer
+    const dataLayers: Phaser.Tilemaps.LayerData[] = [];
+    for (let i = 0; i < map.layersLength(); i++) {
+      const layer = map.layers(i, new MapLayer())!;
+
+      var layerData = new Phaser.Tilemaps.LayerData({
+        name: layer.key()!,
+        width: map.width()!,
+        height: map.height()!
+      });
+
+      // our FlatBuffer gives us a 1D array of the map tiles, our map graphics expect a 2D array
+      const tiles: Phaser.Tilemaps.Tile[][] = Array(map.height()!).fill(null).map((_, y) => Array(map.width()!).fill(null).map((_, x) => {
+        const positionIndex = (map.width()! * y) + x;
+        const tileIndex = layer.data(positionIndex)!;
+        return new Phaser.Tilemaps.Tile(layerData, tileIndex, x, y, 48, 48, 48, 48);
+      }));
+
+      layerData.data = tiles;
+
+      dataLayers.push(layerData);
+    }
+    this.map.layers = dataLayers;
+
+    // create the images associated with this layer, which has to be done after setting the map.layers
+    for (let i = 0; i < map.layersLength(); i++) {
+      const layer = map.layers(i, new MapLayer())!;
+      const tileDisplayLayer = this.map.createLayer(layer.key()!, terrain);
+      this.interfaceCamera.ignore(tileDisplayLayer);
+    }
+
+    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), "hero1", "me");
+    this.sword = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me').setVisible(false);
+    this.cameras.main.startFollow(this.player, true);
+    this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
+
+    this.interfaceCamera.ignore([this.player, this.sword]);
+
+    this.gridEngine.create(this.map, {
+      characters: [
+        this.player.gridEngineCharacterData
+      ],
+      numberOfDirections: 8
+    });
+    this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(value => {
+      // we only care about ourselves
+      if (value.charId !== "me") return;
+      let builder = new Builder(1024);
+
+      MoveCommand.startMoveCommand(builder);
+      MoveCommand.addPos(builder, Vec3.createVec3(builder, value.enterTile.x, value.enterTile.y, 0));
+      const movement = MoveCommand.endMoveCommand(builder);
+
+      Command.startCommand(builder);
+      Command.addSeq(builder, ++this.commandSequencer);
+      Command.addActionType(builder, Action.MoveCommand);
+      Command.addAction(builder, movement);
+      const update = Command.endCommand(builder);
+      builder.finish(update);
+      this.connection.send(builder.asUint8Array());
+    });
+
+    // Player Animations on movement
+    this.player.playStandAnimation(this.gridEngine.getFacingDirection('me'));
+    this.gridEngine.movementStarted().subscribe(({ charId, direction }) => {
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
+      sprite.playWalkAnimation(direction);
+    });
+
+    this.gridEngine.movementStopped().subscribe(({ charId, direction }) => {
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
+      sprite.anims.stop();
+      sprite.setFrame(sprite.getStopFrame(direction));
+      sprite.playStandAnimation(direction);
+    });
+
+    this.currentState = MapSceneState.READY;
   }
 
 }

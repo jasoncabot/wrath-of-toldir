@@ -1,3 +1,5 @@
+include "maps.fbs";
+
 namespace WrathOfToldir;
 
 struct Vec3 {
@@ -28,11 +30,17 @@ table AttackEvent {
     facing: int8;
 }
 
+table MapJoinedEvent {
+    pos: Vec3;
+    tilemap: WrathOfToldir.Maps.TileMap;
+}
+
 union Update { 
     JoinEvent,
     MoveEvent,
     LeaveEvent,
     AttackEvent,
+    MapJoinedEvent,
 }
 
 table EventLog {

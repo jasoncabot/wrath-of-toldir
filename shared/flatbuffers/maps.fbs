@@ -1,0 +1,12 @@
+namespace WrathOfToldir.Maps;
+
+table MapLayer {
+    key: string;
+    data: [uint16];
+}
+
+table TileMap {
+    width: uint16;
+    height: uint16;
+    layers: [MapLayer];
+}

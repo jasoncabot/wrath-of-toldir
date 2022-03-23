@@ -1,10 +1,10 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
-import { JoinEvent, LeaveEvent, MoveEvent, Update, Vec3 } from "@/models/events";
+import { JoinEvent, LeaveEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec3 } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Action, AttackCommand, JoinCommand, LeaveCommand, MoveCommand } from "@/models/commands";
 import { AttackEvent } from "@/models/wrath-of-toldir/events/attack-event";
-import maps from "@/handlers/maps";
+import { MapLayer } from "@/models/maps";
 
 export type MapAction = 'store-key' | 'websocket';
 
@@ -31,6 +31,11 @@ export class Map implements DurableObject {
     connections: Record<PlayerId, Connection>;
     intervalHandle: number;
     commandQueue: ReceivedCommand[];
+    mapData: {
+        layers: { key: string, data: number[][] }[]
+        width: number
+        height: number
+    };
 
     constructor(private readonly state: DurableObjectState, private readonly env: Bindings) {
         this.state = state;
@@ -39,6 +44,21 @@ export class Map implements DurableObject {
         this.connections = {};
         this.commandQueue = [];
         this.intervalHandle = 0;
+
+        const width = 40;
+        const height = 40;
+        this.mapData = {
+            layers: [
+                {
+                    key: "terrain",
+                    data: Array(height).fill(null).map((_, y) => Array(width).fill(null).map((_, x) => {
+                        const tileIndex = Math.floor(Math.random() * 450);
+                        return tileIndex;
+                      }))
+                }
+            ],
+            width, height
+        }
     }
 
     async fetch(request: Request) {
@@ -143,19 +163,16 @@ export class Map implements DurableObject {
                     const join: JoinCommand = command.action(new JoinCommand());
 
                     // update game state
-                    const map = {
-                        width: 40,
-                        height: 40
-                    }
                     player = {
                         key: Math.floor(Math.random() * 2147483647),
                         name: join.name()!,
-                        position: { x: Math.floor(Math.random() * map.width), y: Math.floor(Math.random() * map.height), z: 0 }
+                        position: { x: Math.floor(Math.random() * this.mapData.width), y: Math.floor(Math.random() * this.mapData.height), z: 0 }
                     };
                     this.connections[playerId].player = player;
 
                     // inform other players
                     const joined = findEventStore(playerId);
+                    this.addCurrentMapState(joined, player);
                     const players: PlayerId[] = Object.keys(this.connections); // canObserve(playerId, move);
                     players.forEach(otherPlayerId => {
                         if (otherPlayerId == playerId) return;
@@ -178,7 +195,7 @@ export class Map implements DurableObject {
                         JoinEvent.startJoinEvent(builder);
                         JoinEvent.addKey(builder, player!.key);
                         JoinEvent.addName(builder, nameOffset);
-                        JoinEvent.addPos(builder, Vec3.createVec3(builder, join.pos()?.x() || 0, join.pos()?.y() || 0, 0));
+                        JoinEvent.addPos(builder, Vec3.createVec3(builder, player!.position.x, player!.position.y, player!.position.z));
                         eventOffsets.push(JoinEvent.endJoinEvent(builder));
                         eventTypeOffsets.push(Update.JoinEvent);
                     });
@@ -193,7 +210,7 @@ export class Map implements DurableObject {
 
                     if (Object.keys(this.connections).length === 0) {
                         // no one is connected, no point to carry on ticking
-                        console.log('No players are connected, shutting down game tick...');
+                        console.log('No players are connected, shutting down game tick ...');
                         clearInterval(this.intervalHandle);
                         this.intervalHandle = 0;
                     } else {
@@ -238,7 +255,7 @@ export class Map implements DurableObject {
         // emit events for affected clients
         for (const [playerId, player] of Object.entries(this.connections)) {
             try {
-                if (player.quitting) {
+                if (player.quitting && player.socket.readyState !== WebSocket.READY_STATE_CLOSED) {
                     player.socket.close(1011, "WebSocket broken.");
                     return;
                 }
@@ -260,6 +277,27 @@ export class Map implements DurableObject {
                 console.error(err);
             }
         };
+    }
+
+    addCurrentMapState(buffer: { builder: Builder; eventOffsets: number[]; eventTypeOffsets: number[]; }, player: Player) {
+
+        const { builder, eventOffsets, eventTypeOffsets } = buffer;
+
+        const layerOffsets = this.mapData.layers.map(layer => {
+            const mapKeyOffset = builder.createString(layer.key);
+            const flattenedMapData: number[] = layer.data.flat();
+            const dataOffset = MapLayer.createDataVector(builder, flattenedMapData);
+            return MapLayer.createMapLayer(builder, mapKeyOffset, dataOffset);
+        });
+        const layersVector = TileMap.createLayersVector(builder, layerOffsets);
+        const tilemapOffset = TileMap.createTileMap(builder, this.mapData.width, this.mapData.height, layersVector);
+
+        MapJoinedEvent.startMapJoinedEvent(builder);
+        MapJoinedEvent.addPos(builder, Vec3.createVec3(builder, player.position.x, player.position.y, player.position.z));
+        MapJoinedEvent.addTilemap(builder, tilemapOffset);
+        const eventOffset = MapJoinedEvent.endMapJoinedEvent(builder);
+        eventOffsets.push(eventOffset);
+        eventTypeOffsets.push(Update.MapJoinedEvent);
     }
 
     async handleSession(socket: WebSocket, playerId: PlayerId) {
