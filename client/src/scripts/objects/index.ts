@@ -1,7 +1,7 @@
 import PlayerCharacter from "./playerCharacter";
-import FpsText from "./fpsText";
+import DebugText from "./debugText";
 
 export {
-    FpsText,
+    DebugText,
     PlayerCharacter,
 }

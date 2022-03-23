@@ -1,5 +1,5 @@
 import { Direction, GridEngine } from 'grid-engine'
-import { FpsText, PlayerCharacter } from '../objects/'
+import { DebugText, PlayerCharacter } from '../objects/'
 
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
@@ -37,7 +37,7 @@ enum MapSceneState {
 }
 
 export default class MainScene extends Phaser.Scene {
-  fpsText: FpsText
+  debugText: DebugText
   cursors: Phaser.Types.Input.Keyboard.CursorKeys
   player: PlayerCharacter
   gridEngine: GridEngine
@@ -64,16 +64,16 @@ export default class MainScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.interfaceCamera = this.cameras.add();
 
-    this.fpsText = new FpsText(this);
+    this.debugText = new DebugText(this);
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
-    this.cameras.main.ignore([this.fpsText, hud]);
+    this.cameras.main.ignore([this.debugText, hud]);
 
     // Create our connection to the server
     this.connection = await this.openWebSocket();
   }
 
   update() {
-    this.fpsText.update();
+    this.debugText.update();
 
     if (this.currentState === MapSceneState.READY) {
       this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
@@ -278,6 +278,8 @@ export default class MainScene extends Phaser.Scene {
       this.interfaceCamera.ignore(tileDisplayLayer);
     }
 
+    this.debugText.prefix = this.debugText.prefix = `(${event.pos()!.x()},${event.pos()!.y()})`;
+
     this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), "hero1", "me");
     this.sword = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me').setVisible(false);
     this.cameras.main.startFollow(this.player, true);
@@ -291,13 +293,18 @@ export default class MainScene extends Phaser.Scene {
       ],
       numberOfDirections: 8
     });
-    this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(value => {
+    this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(({ charId, enterTile }) => {
       // we only care about ourselves
-      if (value.charId !== "me") return;
-      let builder = new Builder(1024);
+      if (charId !== "me") return;
+
+      // show our current location in the debug text
+      this.debugText.prefix = `(${enterTile.x},${enterTile.y})`;
+
+      // tell others that we have moved
+      let builder = new Builder(64);
 
       MoveCommand.startMoveCommand(builder);
-      MoveCommand.addPos(builder, Vec3.createVec3(builder, value.enterTile.x, value.enterTile.y, 0));
+      MoveCommand.addPos(builder, Vec3.createVec3(builder, enterTile.x, enterTile.y, 0)); // TODO: get z
       const movement = MoveCommand.endMoveCommand(builder);
 
       Command.startCommand(builder);

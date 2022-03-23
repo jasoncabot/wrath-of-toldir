@@ -220,9 +220,7 @@ export class Map implements DurableObject {
                             if (otherPlayerId == playerId) return;
                             const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
 
-                            LeaveEvent.startLeaveEvent(builder);
-                            LeaveEvent.addKey(builder, player!.key);
-                            eventOffsets.push(LeaveEvent.endLeaveEvent(builder));
+                            eventOffsets.push(LeaveEvent.createLeaveEvent(builder, player!.key));
                             eventTypeOffsets.push(Update.LeaveEvent);
                         });
                     }
