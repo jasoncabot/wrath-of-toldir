@@ -28,5 +28,6 @@ jobs:
       - name: Deploy Server
         uses: cloudflare/wrangler-action@1.3.0
         with:
-          workingDirection: ./server
+          workingDirectory: ./server
+          environment: production
           apiToken: ${{ secrets.CF_API_TOKEN }}
