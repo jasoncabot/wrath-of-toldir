@@ -5,8 +5,14 @@ table MapLayer {
     data: [uint16];
 }
 
+table TileSet {
+    key: string;
+    gid: uint16;
+}
+
 table TileMap {
     width: uint16;
     height: uint16;
     layers: [MapLayer];
+    tilesets: [TileSet];
 }

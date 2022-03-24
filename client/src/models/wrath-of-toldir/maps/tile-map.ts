@@ -3,6 +3,7 @@
 import * as flatbuffers from 'flatbuffers';
 
 import { MapLayer } from '../../wrath-of-toldir/maps/map-layer';
+import { TileSet } from '../../wrath-of-toldir/maps/tile-set';
 
 
 export class TileMap {
@@ -43,8 +44,18 @@ layersLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
+tilesets(index: number, obj?:TileSet):TileSet|null {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? (obj || new TileSet()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+tilesetsLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
 static startTileMap(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(4);
 }
 
 static addWidth(builder:flatbuffers.Builder, width:number) {
@@ -71,16 +82,33 @@ static startLayersVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
 }
 
+static addTilesets(builder:flatbuffers.Builder, tilesetsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, tilesetsOffset, 0);
+}
+
+static createTilesetsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startTilesetsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
 static endTileMap(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createTileMap(builder:flatbuffers.Builder, width:number, height:number, layersOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createTileMap(builder:flatbuffers.Builder, width:number, height:number, layersOffset:flatbuffers.Offset, tilesetsOffset:flatbuffers.Offset):flatbuffers.Offset {
   TileMap.startTileMap(builder);
   TileMap.addWidth(builder, width);
   TileMap.addHeight(builder, height);
   TileMap.addLayers(builder, layersOffset);
+  TileMap.addTilesets(builder, tilesetsOffset);
   return TileMap.endTileMap(builder);
 }
 }

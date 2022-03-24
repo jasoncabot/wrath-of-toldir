@@ -4,9 +4,15 @@ import { JoinEvent, LeaveEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec3
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Action, AttackCommand, JoinCommand, LeaveCommand, MoveCommand } from "@/models/commands";
 import { AttackEvent } from "@/models/wrath-of-toldir/events/attack-event";
-import { MapLayer } from "@/models/maps";
+import { MapLayer, TileSet } from "@/models/maps";
 
 export type MapAction = 'store-key' | 'websocket';
+
+import fisherswatch from '../data/maps/fisherswatch.json';
+const maps: Record<string, any> = {
+    fisherswatch
+}
+export const validMaps = new Set(Object.keys(maps));
 
 type PlayerId = string
 
@@ -27,15 +33,37 @@ interface ReceivedCommand {
     command: Command
 }
 
+interface MapDataLayer {
+    key: string
+    data: number[]
+}
+
+interface MapTileSet {
+    key: string
+    gid: number
+}
+
+interface TiledJSON {
+    layers: MapDataLayer[]
+    tilesets: MapTileSet[]
+    width: number
+    height: number
+}
+
+const parseTileSets: (map: TiledJSON) => MapTileSet[] = (map: TiledJSON) => {
+    return map.tilesets.map((x: any) => {
+        return {
+            key: x.source.match(/\/([^/]+)\.tsx/)[1],
+            gid: x.firstgid
+        }
+    });
+}
+
 export class Map implements DurableObject {
     connections: Record<PlayerId, Connection>;
     intervalHandle: number;
     commandQueue: ReceivedCommand[];
-    mapData: {
-        layers: { key: string, data: number[][] }[]
-        width: number
-        height: number
-    };
+    mapData: TiledJSON | undefined;
 
     constructor(private readonly state: DurableObjectState, private readonly env: Bindings) {
         this.state = state;
@@ -44,21 +72,7 @@ export class Map implements DurableObject {
         this.connections = {};
         this.commandQueue = [];
         this.intervalHandle = 0;
-
-        const width = 40;
-        const height = 40;
-        this.mapData = {
-            layers: [
-                {
-                    key: "terrain",
-                    data: Array(height).fill(null).map((_, y) => Array(width).fill(null).map((_, x) => {
-                        const tileIndex = Math.floor(Math.random() * 450);
-                        return tileIndex;
-                      }))
-                }
-            ],
-            width, height
-        }
+        this.mapData = undefined;
     }
 
     async fetch(request: Request) {
@@ -71,7 +85,22 @@ export class Map implements DurableObject {
                     const [client, server] = Object.values(new WebSocketPair());
 
                     const playerId = request.headers.get('X-PlayerId')!;
-                    const socketKey = request.headers.get('X-Socket-Key')!;
+                    const mapId = request.headers.get('X-MapId')!;
+
+                    if (validMaps.has(mapId)) {
+                        const map = maps[mapId];
+                        this.mapData = {
+                            layers: map.layers.map((layer: any) => {
+                                return {
+                                    key: layer.name,
+                                    data: layer.data
+                                }
+                            }),
+                            tilesets: parseTileSets(map),
+                            width: map.width,
+                            height: map.height
+                        }
+                    }
 
                     // TODO: ensure that socketKey matches the key we stored earlier
                     await this.handleSession(server, playerId);
@@ -84,7 +113,6 @@ export class Map implements DurableObject {
                         },
                         webSocket: client
                     });
-                    break;
                 }
 
                 case "store-key": {
@@ -98,7 +126,6 @@ export class Map implements DurableObject {
                             'Content-type': 'application/json'
                         }
                     });
-                    break;
                 }
 
                 default:
@@ -166,7 +193,7 @@ export class Map implements DurableObject {
                     player = {
                         key: Math.floor(Math.random() * 2147483647),
                         name: join.name()!,
-                        position: { x: Math.floor(Math.random() * this.mapData.width), y: Math.floor(Math.random() * this.mapData.height), z: 0 }
+                        position: { x: Math.floor(Math.random() * this.mapData!.width), y: Math.floor(Math.random() * this.mapData!.height), z: 0 }
                     };
                     this.connections[playerId].player = player;
 
@@ -279,16 +306,25 @@ export class Map implements DurableObject {
 
     addCurrentMapState(buffer: { builder: Builder; eventOffsets: number[]; eventTypeOffsets: number[]; }, player: Player) {
 
+        if (!this.mapData) {
+            console.error("Attempted to send current state when it does not exist");
+            return;
+        }
+
         const { builder, eventOffsets, eventTypeOffsets } = buffer;
 
         const layerOffsets = this.mapData.layers.map(layer => {
             const mapKeyOffset = builder.createString(layer.key);
-            const flattenedMapData: number[] = layer.data.flat();
-            const dataOffset = MapLayer.createDataVector(builder, flattenedMapData);
+            const dataOffset = MapLayer.createDataVector(builder, layer.data);
             return MapLayer.createMapLayer(builder, mapKeyOffset, dataOffset);
         });
+        const tilesetOffsets = this.mapData.tilesets.map(set => {
+            const mapKeyOffset = builder.createString(set.key);
+            return TileSet.createTileSet(builder, mapKeyOffset, set.gid);
+        });
         const layersVector = TileMap.createLayersVector(builder, layerOffsets);
-        const tilemapOffset = TileMap.createTileMap(builder, this.mapData.width, this.mapData.height, layersVector);
+        const tilesetsVector = TileMap.createTilesetsVector(builder, tilesetOffsets);
+        const tilemapOffset = TileMap.createTileMap(builder, this.mapData.width, this.mapData.height, layersVector, tilesetsVector);
 
         MapJoinedEvent.startMapJoinedEvent(builder);
         MapJoinedEvent.addPos(builder, Vec3.createVec3(builder, player.position.x, player.position.y, player.position.z));

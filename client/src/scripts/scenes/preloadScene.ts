@@ -6,8 +6,18 @@ export default class PreloadScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.spritesheet('rural_village_terrain', 'assets/spritesheets/Tilesets/Rural Village Terrain48.png', { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('rural_village_water', 'assets/spritesheets/Animated Tiles/Village Animated Water48.png', { frameWidth: 48, frameHeight: 48 });
+    // These must match what the server is sending as the tileset.key
+    this.load.spritesheet('decoration', 'assets/spritesheets/Tilesets/Rural Village Decoration48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('farming', 'assets/spritesheets/Tilesets/Rural Village Farming48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('floors', 'assets/spritesheets/Tilesets/Rural Village Floors48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('marketplace', 'assets/spritesheets/Tilesets/Rural Village Marketplace48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('nature', 'assets/spritesheets/Tilesets/Rural Village Nature48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('roofs', 'assets/spritesheets/Tilesets/Rural Village Roofs48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('terrain', 'assets/spritesheets/Tilesets/Rural Village Terrain48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('walls', 'assets/spritesheets/Tilesets/Rural Village Walls48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('water', 'assets/spritesheets/Tilesets/Rural Village Water48.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('windows', 'assets/spritesheets/Tilesets/Rural Village Doors Windows48.png', { frameWidth: 48, frameHeight: 48 });
+
     this.load.spritesheet('hero1', 'assets/spritesheets/Sprites/Heroes/Hero 01 48.png', { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('sword', 'assets/spritesheets/Sprites/Weapons/sword-01.png', { frameWidth: 144, frameHeight: 144 });
 

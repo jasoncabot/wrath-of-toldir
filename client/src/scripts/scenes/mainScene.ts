@@ -13,7 +13,7 @@ import Weapon, { preloadWeapon } from '../objects/weapon';
 import WebSocketClient from '@gamestdio/websocket';
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
-import { MapLayer } from '../../models/maps';
+import { MapLayer, TileSet } from '../../models/maps';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -87,18 +87,19 @@ export default class MainScene extends Phaser.Scene {
 
   async openWebSocket() {
     // GET /api/map/name
-    // to get an auth token to open a websocket
+    // to get an auth token and map id to to open a websocket
 
-    const mapId = "fairweather";
+    const mapId = "fisherswatch";
     const wsURI = `${process.env.WS_URI}/api/map/${mapId}/connection`;
-    console.log(`Connecting ${wsURI} ...`);
+    console.log(`Socket connecting ${wsURI} ...`);
 
     const ws = new WebSocketClient(wsURI, [], {
       backoff: "exponential",
       initialDelay: 1
     });
     ws.onopen = (event: Event) => {
-      let builder = new Builder(1024);
+      console.log(`Socket connected ...`);
+      let builder = new Builder(128);
 
       const name = uuidv4();
       const nameOffset = builder.createString(name);
@@ -121,12 +122,8 @@ export default class MainScene extends Phaser.Scene {
       this.applyUpdate(EventLog.getRootAsEventLog(bb));
     };
     ws.onclose = (event: CloseEvent) => {
-      console.log("Connection closed. Removing old sprites ...");
-      this.map.destroy();
-      this.sword.destroy();
-      this.player.destroy();
-      this.gridEngine.destroy();
-
+      console.log("Socket closed ... Removing old sprites ...");
+      [this.map, this.sword, this.player, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
       this.children.list.filter(child => {
         if (child instanceof PlayerCharacter && child != this.player) return true;
         if (child instanceof Weapon && child != this.sword) return true;
@@ -135,10 +132,10 @@ export default class MainScene extends Phaser.Scene {
       this.currentState = MapSceneState.INITIAL;
     };
     ws.onerror = (event: Event) => {
-      console.error("Connection error.");
+      console.log("Socket error ...");
     };
     ws.onreconnect = (event: Event) => {
-      console.log("Connection lost. Re-connecting ...");
+      console.log("Socket reconnected ...");
     }
 
     return ws;
@@ -245,7 +242,12 @@ export default class MainScene extends Phaser.Scene {
 
     // Create the images that are displayed for each layer of our map
     // This is the first thing we expect to get after joining a game
-    const terrain = this.map.addTilesetImage("rural_village_terrain");
+    const tilesetLayers: Phaser.Tilemaps.Tileset[] = [];
+    for (let i = 0; i < map.tilesetsLength(); i++) {
+      const x: TileSet = map.tilesets(i, new TileSet())!;
+      const terrain = this.map.addTilesetImage(x.key()!, x.key()!, undefined, undefined, undefined, undefined, x.gid());
+      tilesetLayers.push(terrain);
+    }
 
     // create the data for every layer
     const dataLayers: Phaser.Tilemaps.LayerData[] = [];
@@ -259,13 +261,11 @@ export default class MainScene extends Phaser.Scene {
       });
 
       // our FlatBuffer gives us a 1D array of the map tiles, our map graphics expect a 2D array
-      const tiles: Phaser.Tilemaps.Tile[][] = Array(map.height()!).fill(null).map((_, y) => Array(map.width()!).fill(null).map((_, x) => {
+      layerData.data = Array(map.height()!).fill(null).map((_, y) => Array(map.width()!).fill(null).map((_, x) => {
         const positionIndex = (map.width()! * y) + x;
         const tileIndex = layer.data(positionIndex)!;
         return new Phaser.Tilemaps.Tile(layerData, tileIndex, x, y, 48, 48, 48, 48);
       }));
-
-      layerData.data = tiles;
 
       dataLayers.push(layerData);
     }
@@ -274,7 +274,7 @@ export default class MainScene extends Phaser.Scene {
     // create the images associated with this layer, which has to be done after setting the map.layers
     for (let i = 0; i < map.layersLength(); i++) {
       const layer = map.layers(i, new MapLayer())!;
-      const tileDisplayLayer = this.map.createLayer(layer.key()!, terrain);
+      const tileDisplayLayer = this.map.createLayer(layer.key()!, tilesetLayers, 0, 0);
       this.interfaceCamera.ignore(tileDisplayLayer);
     }
 
