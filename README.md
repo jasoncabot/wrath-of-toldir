@@ -8,9 +8,9 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 - [X] Add an attack action
 - [ ] Attacks should kill NPC
 - [ ] Loot items
-- [.] HUD
+- [ ] HUD
 - [ ] Transfer player between maps
-- [ ] Maps should share tiles
+- [X] Maps should share tiles
 - [X] Events should trigger animations
 
 ## Development
