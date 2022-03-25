@@ -20,6 +20,7 @@ export default class PreloadScene extends Phaser.Scene {
 
     this.load.spritesheet('hero1', 'assets/spritesheets/Sprites/Heroes/Hero 01 48.png', { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('sword', 'assets/spritesheets/Sprites/Weapons/sword-01.png', { frameWidth: 144, frameHeight: 144 });
+    this.load.spritesheet('slime1', 'assets/spritesheets/Sprites/Monsters/Slime 01 48.png', { frameWidth: 48, frameHeight: 48 });
 
     this.load.image('hud', 'assets/img/hud.png');
 

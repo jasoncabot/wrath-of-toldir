@@ -3,17 +3,18 @@ import { DebugText, PlayerCharacter } from '../objects/'
 
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
-import { AttackEvent, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
+import { AttackEvent, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
 import { MoveCommand, JoinCommand, Action, Vec3 } from '../../models/commands';
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
-import { preloadPlayerCharacter, SpriteTexture } from '../objects/playerCharacter';
+import { preloadPlayerCharacter, SpriteTexture, WalkingAnimatable } from '../objects/playerCharacter';
 import Weapon, { preloadWeapon } from '../objects/weapon';
 import WebSocketClient from '@gamestdio/websocket';
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { MapLayer, TileSet } from '../../models/maps';
+import Monster, { MonsterTexture } from '../objects/monster';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -36,6 +37,15 @@ enum MapSceneState {
   READY
 }
 
+const authToken = () => {
+  let token = window.sessionStorage.getItem('token');
+  if (!token) {
+    token = uuidv4();
+    window.sessionStorage.setItem('token', token);
+  }
+  return token;
+}
+
 export default class MainScene extends Phaser.Scene {
   debugText: DebugText
   cursors: Phaser.Types.Input.Keyboard.CursorKeys
@@ -56,7 +66,8 @@ export default class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    preloadPlayerCharacter(this);
+    Monster.preload(this, "slime1");
+    preloadPlayerCharacter(this); // TODO: use static style with texture name like above
     preloadWeapon(this);
   }
 
@@ -90,7 +101,14 @@ export default class MainScene extends Phaser.Scene {
     // to get an auth token and map id to to open a websocket
 
     const mapId = "fisherswatch";
-    const wsURI = `${process.env.WS_URI}/api/map/${mapId}/connection`;
+    const apiURI = `${process.env.API_URI}/api/map/${mapId}`;
+    const response = await fetch(apiURI, { headers: { 'Authorization': `Bearer ${authToken()}` } });
+    if (!response) {
+      throw new Error("Failed to fetch WebSocket connection token. Do you have an auth token?");
+    }
+    const wsConnectionToken = await response.text();
+
+    const wsURI = `${process.env.WS_URI}/api/map/${mapId}/connection?token=${wsConnectionToken}`;
     console.log(`Socket connecting ${wsURI} ...`);
 
     const ws = new WebSocketClient(wsURI, [], {
@@ -142,17 +160,6 @@ export default class MainScene extends Phaser.Scene {
   }
 
   addOrMoveCharacter(key: string, texture: SpriteTexture, position: Vec3, name: string | null) {
-    if (this.currentState !== MapSceneState.READY) return;
-    const alreadyAdded = this.gridEngine.hasCharacter(key);
-    if (!alreadyAdded) {
-      const pc = new PlayerCharacter(this, position.x(), position.y(), texture, key);
-      pc.setData("name", name);
-      this.gridEngine.addCharacter(pc.gridEngineCharacterData);
-      pc.playStandAnimation(this.gridEngine.getFacingDirection(key));
-      this.interfaceCamera.ignore(pc);
-    } else {
-      this.gridEngine.moveTo(key, { x: position.x(), y: position.y() });
-    }
   }
 
   submitAttack() {
@@ -193,13 +200,18 @@ export default class MainScene extends Phaser.Scene {
     for (let i = 0; i < update.eventsLength(); i++) {
       switch (update.eventsType(i)) {
         case Update.MoveEvent: {
+          if (this.currentState !== MapSceneState.READY) break;
           const move: MoveEvent = update.events(i, new MoveEvent());
-          this.addOrMoveCharacter(move.key().toString(), "hero1", move.pos()!, null);
+          this.gridEngine.moveTo(move.key().toString(), { x: move.pos()!.x(), y: move.pos()!.y() });
           break;
         }
         case Update.JoinEvent: {
           const join: JoinEvent = update.events(i, new JoinEvent());
-          this.addOrMoveCharacter(join.key().toString(), "hero1", join.pos()!, join.name());
+          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), "hero1", join.key().toString());
+          pc.setData("name", join.name());
+          this.gridEngine.addCharacter(pc.gridEngineCharacterData);
+          pc.playStandAnimation(this.gridEngine.getFacingDirection(join.key().toString()));
+          this.interfaceCamera.ignore(pc);
           break;
         }
         case Update.LeaveEvent: {
@@ -209,6 +221,7 @@ export default class MainScene extends Phaser.Scene {
           break;
         }
         case Update.AttackEvent: {
+          if (this.currentState !== MapSceneState.READY) break;
           const attack: AttackEvent = update.events(i, new AttackEvent());
 
           const key = attack.key().toString();
@@ -226,7 +239,6 @@ export default class MainScene extends Phaser.Scene {
         }
         case Update.MapJoinedEvent: {
           const event: MapJoinedEvent = update.events(i, new MapJoinedEvent());
-
           this.transitionToReady(event);
           break;
         }
@@ -293,6 +305,15 @@ export default class MainScene extends Phaser.Scene {
       ],
       numberOfDirections: 8
     });
+
+    for (let i = 0; i < event.npcsLength(); i++) {
+      const npc = event.npcs(i)!;
+      const sprite = new Monster(this, npc.pos()!.x(), npc.pos()!.y(), npc.texture()! as MonsterTexture, npc.key().toString(), npc.hp());
+      this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
+      sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
+      this.interfaceCamera.ignore(sprite);
+    }
+
     this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(({ charId, enterTile }) => {
       // we only care about ourselves
       if (charId !== "me") return;
@@ -319,21 +340,15 @@ export default class MainScene extends Phaser.Scene {
     // Player Animations on movement
     this.player.playStandAnimation(this.gridEngine.getFacingDirection('me'));
     this.gridEngine.movementStarted().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
+      const sprite = this.gridEngine.getSprite(charId) as unknown as WalkingAnimatable;
       sprite.playWalkAnimation(direction);
     });
 
     this.gridEngine.movementStopped().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
-      sprite.anims.stop();
-      sprite.setFrame(sprite.getStopFrame(direction));
+      const sprite = this.gridEngine.getSprite(charId) as unknown as WalkingAnimatable;
       sprite.playStandAnimation(direction);
     });
 
     this.currentState = MapSceneState.READY;
   }
-
 }
-
-
-

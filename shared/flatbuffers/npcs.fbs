@@ -1,0 +1,10 @@
+include "util.fbs";
+
+namespace WrathOfToldir.Npcs;
+
+table Npc {
+    key: int32;
+    texture: string;
+    pos: Vec3;
+    hp: uint16;
+}

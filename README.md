@@ -4,7 +4,7 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 
 ## TODO List
 
-- [ ] Add NPC characters that just amble about
+- [X] Add NPC characters that just amble about
 - [X] Add an attack action
 - [ ] Attacks should kill NPC
 - [ ] Loot items
@@ -12,6 +12,8 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 - [ ] Transfer player between maps
 - [X] Maps should share tiles
 - [X] Events should trigger animations
+- [ ] Water should be animated
+- [ ] Tile Collisions
 
 ## Development
 
@@ -26,3 +28,10 @@ $ yarn start
 # In ./server
 $ yarn dev
 ```
+
+## Credits
+
+* Phaser 3 - https://github.com/photonstorm/phaser
+* Artwork from 'World of Solaria' - http://www.jamiebrownhill.com
+* Serialisation using FlatBuffers - https://github.com/google/flatbuffers
+

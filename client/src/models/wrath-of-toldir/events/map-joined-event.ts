@@ -3,6 +3,7 @@
 import * as flatbuffers from 'flatbuffers';
 
 import { TileMap } from '../../wrath-of-toldir/maps/tile-map';
+import { Npc } from '../../wrath-of-toldir/npcs/npc';
 import { Vec3 } from '../../wrath-of-toldir/vec3';
 
 
@@ -34,8 +35,18 @@ tilemap(obj?:TileMap):TileMap|null {
   return offset ? (obj || new TileMap()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+npcs(index: number, obj?:Npc):Npc|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? (obj || new Npc()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+npcsLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
 static startMapJoinedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 }
 
 static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
@@ -44,6 +55,22 @@ static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
 
 static addTilemap(builder:flatbuffers.Builder, tilemapOffset:flatbuffers.Offset) {
   builder.addFieldOffset(1, tilemapOffset, 0);
+}
+
+static addNpcs(builder:flatbuffers.Builder, npcsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, npcsOffset, 0);
+}
+
+static createNpcsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startNpcsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
 }
 
 static endMapJoinedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

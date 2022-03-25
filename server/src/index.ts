@@ -6,9 +6,16 @@ import { RequestWithUser, requireUser } from './middleware/auth';
 
 const router = Router<RequestWithUser>({ base: '/api' })
   .get('/characters', withUser, requireUser, CharacterHandler.list)
-  .get('/map/:id/connection', withUser, requireUser, MapHandler.connect)
+  .get('/map/:id/connection', MapHandler.connect)
   .get('/map/:id', withUser, requireUser, MapHandler.show)
-  .get('*', (request: any) => new Response('Handler not registered', { status: 404 }));
+  .options('*', (_, env: Bindings) => new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': env.FRONTEND_URI,
+      'Access-Control-Allow-Headers': 'Authorization, Upgrade-Insecure-Requests'
+    }
+  }))
+  .get('*', (_: Request) => new Response('Handler not registered', { status: 404 }));
 
 const worker: ExportedHandler<Bindings> = {
   fetch: async (request: Request, env: Bindings, context: ExecutionContext) => {

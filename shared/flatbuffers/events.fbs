@@ -1,12 +1,6 @@
+include "util.fbs";
 include "maps.fbs";
-
-namespace WrathOfToldir;
-
-struct Vec3 {
-  x:short;
-  y:short;
-  z:short;
-}
+include "npcs.fbs";
 
 namespace WrathOfToldir.Events;
 
@@ -33,6 +27,7 @@ table AttackEvent {
 table MapJoinedEvent {
     pos: Vec3;
     tilemap: WrathOfToldir.Maps.TileMap;
+    npcs: [WrathOfToldir.Npcs.Npc];
 }
 
 union Update { 

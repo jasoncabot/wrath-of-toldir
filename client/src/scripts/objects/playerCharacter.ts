@@ -1,7 +1,12 @@
 import { CharacterData, Direction, GridEngine } from "grid-engine";
-import Weapon from "./weapon";
 
 export type SpriteTexture = 'hero1'
+
+export interface WalkingAnimatable {
+  playWalkAnimation(direction: Direction);
+  playStandAnimation(direction: Direction);
+  playAttackAnimation(direction: Direction);
+}
 
 export const normalisedFacingDirection = (direction: Direction) => {
   switch (direction) {
@@ -17,7 +22,7 @@ export const normalisedFacingDirection = (direction: Direction) => {
   }
 }
 
-export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
+export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implements WalkingAnimatable {
   identifier: string;
   gridEngineCharacterData: CharacterData;
   canAttack: boolean
@@ -56,6 +61,9 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
   }
 
   playStandAnimation(direction: Direction) {
+    this.anims.stop();
+    this.setFrame(this.getStopFrame(direction));
+
     const anim = "hero1_stand_" + normalisedFacingDirection(direction);
     return this.play(anim);
   }
@@ -122,54 +130,58 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
 }
 
 const preloadPlayerCharacter = (scene: Phaser.Scene) => {
-  const rate = 16;
+  const frameRate = {
+    attack: 16,
+    stand: 4,
+    walk: 6
+  };
 
   scene.anims.create({
     key: 'hero1_attack_' + Direction.DOWN,
     frames: scene.anims.generateFrameNumbers('hero1', { frames: [65, 67, 68, 70] }),
-    frameRate: rate
+    frameRate: frameRate.attack
   });
   scene.anims.create({
     key: 'hero1_attack_' + Direction.UP,
     frames: scene.anims.generateFrameNumbers('hero1', { frames: [88, 90, 93, 95] }),
-    frameRate: rate
+    frameRate: frameRate.attack
   });
   scene.anims.create({
     key: 'hero1_attack_' + Direction.RIGHT,
     frames: scene.anims.generateFrameNumbers('hero1', { frames: [96, 98, 108, 110] }),
-    frameRate: rate
+    frameRate: frameRate.attack
   });
   scene.anims.create({
     key: 'hero1_attack_' + Direction.LEFT,
     frames: scene.anims.generateFrameNumbers('hero1', { frames: [121, 123, 117, 119] }),
-    frameRate: rate
+    frameRate: frameRate.attack
   });
 
   scene.anims.create({
     key: 'hero1_stand_' + Direction.DOWN,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [0, 1, 2, 3] }),
-    frameRate: 10,
+    frameRate: frameRate.stand,
     repeat: -1,
     yoyo: true,
   });
   scene.anims.create({
     key: 'hero1_stand_' + Direction.LEFT,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [8, 9, 10, 11] }),
-    frameRate: 10,
+    frameRate: frameRate.stand,
     repeat: -1,
     yoyo: true,
   });
   scene.anims.create({
     key: 'hero1_stand_' + Direction.RIGHT,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [16, 17, 18, 19] }),
-    frameRate: 10,
+    frameRate: frameRate.stand,
     repeat: -1,
     yoyo: true,
   });
   scene.anims.create({
     key: 'hero1_stand_' + Direction.UP,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [24, 25, 26, 27] }),
-    frameRate: 10,
+    frameRate: frameRate.stand,
     repeat: -1,
     yoyo: true,
   });
@@ -177,28 +189,28 @@ const preloadPlayerCharacter = (scene: Phaser.Scene) => {
   scene.anims.create({
     key: 'hero1_walk_' + Direction.DOWN,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [32, 33, 34, 35] }),
-    frameRate: 10,
+    frameRate: frameRate.walk,
     repeat: -1,
     yoyo: true,
   });
   scene.anims.create({
     key: 'hero1_walk_' + Direction.UP,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [56, 57, 58, 59] }),
-    frameRate: 10,
+    frameRate: frameRate.walk,
     repeat: -1,
     yoyo: true,
   });
   scene.anims.create({
     key: 'hero1_walk_' + Direction.RIGHT,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [48, 49, 50, 51] }),
-    frameRate: 10,
+    frameRate: frameRate.walk,
     repeat: -1,
     yoyo: true,
   });
   scene.anims.create({
     key: 'hero1_walk_' + Direction.LEFT,
     frames: scene.anims.generateFrameNumbers("hero1", { frames: [40, 41, 42, 43] }),
-    frameRate: 10,
+    frameRate: frameRate.walk,
     repeat: -1,
     yoyo: true,
   });

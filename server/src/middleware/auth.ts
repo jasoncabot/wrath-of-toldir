@@ -6,11 +6,15 @@ export interface User {
 }
 
 export interface RequestWithUser extends Request {
-    user: User
+    user: User | undefined
+    headers: Headers
 }
 
 export const withUser = (request: RequestWithUser) => {
-    request.user = { id: uuidv4() } // TODO: this isn't right - validate the request JWT and extract the user id
+    const token = request.headers.get("Authorization")?.slice(7); // strip off Bearer
+    if (!!token) {
+        request.user = { id: token };
+    }
 }
 
 export const requireUser = (request: RequestWithUser) => {

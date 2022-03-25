@@ -1,0 +1,7 @@
+namespace WrathOfToldir;
+
+struct Vec3 {
+  x:short;
+  y:short;
+  z:short;
+}

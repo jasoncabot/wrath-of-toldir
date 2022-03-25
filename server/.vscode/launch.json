@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "Miniflare (node)",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/node_modules/.bin/miniflare",
+            "args": [
+                "--live-reload",
+                "--debug"
+            ],
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        }
+    ]
+}
