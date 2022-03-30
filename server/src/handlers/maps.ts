@@ -1,4 +1,5 @@
-import { MapAction, validMaps } from "@/durable-objects/map";
+import { validMaps } from "@/data/maps";
+import { MapAction } from "@/durable-objects/map";
 import { RequestWithUser } from "@/middleware/auth";
 import { Request } from "itty-router";
 import { v4 as uuidv4 } from 'uuid';

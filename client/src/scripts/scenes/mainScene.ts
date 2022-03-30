@@ -202,10 +202,19 @@ export default class MainScene extends Phaser.Scene {
         case Update.MoveEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const move: MoveEvent = update.events(i, new MoveEvent());
-          this.gridEngine.moveTo(move.key().toString(), { x: move.pos()!.x(), y: move.pos()!.y() });
+          // We only bother animating (calling moveTo which is expensive since it does all kinds of pathfinding...)
+          // if the character is likely already on screen
+          const other = this.gridEngine.getSprite(move.key().toString());
+          const onScreen = this.cameras.main.worldView.contains(other.x, other.y) || this.cameras.main.worldView.contains(other.x + other.width, other.y + other.height);
+          if (onScreen) {
+            this.gridEngine.moveTo(move.key().toString(), { x: move.pos()!.x(), y: move.pos()!.y() });
+          } else {
+            this.gridEngine.setPosition(move.key().toString(), { x: move.pos()!.x(), y: move.pos()!.y() });
+          }
           break;
         }
         case Update.JoinEvent: {
+          if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
           const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), "hero1", join.key().toString());
           pc.setData("name", join.name());
