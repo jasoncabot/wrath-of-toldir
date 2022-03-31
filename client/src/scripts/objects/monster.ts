@@ -22,6 +22,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
     monsterTexture: MonsterTexture;
     gridEngineCharacterData: CharacterData;
     hp: number;
+    walkingState: "walk" | "stand" | "attack";
 
     constructor(scene: Phaser.Scene, x: number, y: number, texture: MonsterTexture, identifier: string, hp: number) {
         super(scene, 0, 0, texture, 0);
@@ -38,6 +39,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
             facingDirection: Direction.DOWN
         }
         this.hp = hp;
+        this.walkingState = "stand";
 
         scene.add.existing(this);
     }
@@ -53,22 +55,30 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
     }
 
     playWalkAnimation(direction: Direction) {
+        this.walkingState = "walk";
         const anim = this.monsterTexture + "_walk_" + normalisedFacingDirection(direction);
         return this.play(anim);
     }
 
     playStandAnimation(direction: Direction) {
+        this.walkingState = "stand";
         this.anims.stop();
         this.setFrame(this.getStopFrame(direction));
-    
+
         const anim = this.monsterTexture + "_stand_" + normalisedFacingDirection(direction);
         return this.play(anim);
     }
 
     playAttackAnimation(direction: Direction) {
+        const oldState = this.walkingState;
+        this.walkingState = "attack";
         const anim = this.monsterTexture + "_attack_" + normalisedFacingDirection(direction);
         return this.play(anim).on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
-            this.playStandAnimation(direction);
+            if (oldState == "walk") {
+                this.playWalkAnimation(direction);
+            } else {
+                this.playStandAnimation(direction);
+            }
         });
     }
 
@@ -77,8 +87,8 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
             attack: 16,
             stand: 4,
             walk: 6
-          };
-        
+        };
+
         // scene.anims.create({
         //     key: texture + '_attack_' + Direction.DOWN,
         //     frames: scene.anims.generateFrameNumbers(texture, { frames: [65, 67, 68, 70] }),

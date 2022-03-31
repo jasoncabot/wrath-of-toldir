@@ -20,6 +20,8 @@ export interface Connection {
     player: Player | undefined // set after a player has 'joined' this connection
 }
 
+const TICK_RATE = 500;
+
 export class Map implements DurableObject {
     socketKeys: Record<string, string>;
     connections: Record<PlayerId, Connection>;
@@ -385,7 +387,7 @@ export class Map implements DurableObject {
         // Well this is our main game loop
         if (!this.intervalHandle) {
             console.log(`Player connected, starting up game tick ...`);
-            this.intervalHandle = setInterval(this.onGameTick.bind(this), 100);
+            this.intervalHandle = setInterval(this.onGameTick.bind(this), TICK_RATE);
         }
 
         socket.accept();

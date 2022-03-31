@@ -8,8 +8,8 @@ import { MoveCommand, JoinCommand, Action, Vec3 } from '../../models/commands';
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
-import { preloadPlayerCharacter, SpriteTexture, WalkingAnimatable } from '../objects/playerCharacter';
-import Weapon, { preloadWeapon } from '../objects/weapon';
+import { SpriteTexture, WalkingAnimatable } from '../objects/playerCharacter';
+import Weapon from '../objects/weapon';
 import WebSocketClient from '@gamestdio/websocket';
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
@@ -54,7 +54,6 @@ export default class MainScene extends Phaser.Scene {
   map: Phaser.Tilemaps.Tilemap
   interfaceCamera: Phaser.Cameras.Scene2D.Camera;
   onPositionChangedSubscription: any;
-  sword: Weapon;
   connection: WebSocketClient;
   commandSequencer: number;
   currentState = MapSceneState.INITIAL;
@@ -67,8 +66,8 @@ export default class MainScene extends Phaser.Scene {
 
   preload() {
     Monster.preload(this, "slime1");
-    preloadPlayerCharacter(this); // TODO: use static style with texture name like above
-    preloadWeapon(this);
+    PlayerCharacter.preload(this, "hero1");
+    Weapon.preload(this);
   }
 
   async create() {
@@ -88,7 +87,6 @@ export default class MainScene extends Phaser.Scene {
 
     if (this.currentState === MapSceneState.READY) {
       this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
-      if (this.sword.visible) this.sword.setPosition(this.player.getCenter().x, this.player.getCenter().y);
 
       if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
         this.applyDefaultAction();
@@ -141,10 +139,10 @@ export default class MainScene extends Phaser.Scene {
     };
     ws.onclose = (event: CloseEvent) => {
       console.log("Socket closed ... Removing old sprites ...");
-      [this.map, this.sword, this.player, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
+      [this.map, this.player, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
       this.children.list.filter(child => {
         if (child instanceof PlayerCharacter && child != this.player) return true;
-        if (child instanceof Weapon && child != this.sword) return true;
+        if (child instanceof Weapon && child != this.player.weaponSprite) return true;
         return false;
       }).forEach(x => x.destroy());
       this.currentState = MapSceneState.INITIAL;
@@ -165,10 +163,10 @@ export default class MainScene extends Phaser.Scene {
   submitAttack() {
     const facing = this.gridEngine.getFacingDirection('me');
 
-    this.sword
-      .setVisible(true)
-      .setPosition(this.player.getCenter().x, this.player.getCenter().y)
-      .playAttackAnimation(facing);
+    if (!this.player.weaponSprite) {
+      this.player.weaponSprite = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me');
+      this.interfaceCamera.ignore(this.player.weaponSprite);
+    }
     this.player.playAttackAnimation(facing);
 
     let builder = new Builder(1024);
@@ -238,10 +236,10 @@ export default class MainScene extends Phaser.Scene {
           const otherPlayer = this.gridEngine.getSprite(key) as PlayerCharacter;
           this.gridEngine.turnTowards(key, direction);
 
-          // TODO: only add a new weapon if there isn't one for this player already
-          const sword = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
-          this.interfaceCamera.ignore(sword);
-          sword.playAttackAnimation(direction);
+          if (!otherPlayer.weaponSprite) {
+            otherPlayer.weaponSprite = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
+            this.interfaceCamera.ignore(otherPlayer.weaponSprite);
+          }
           otherPlayer.playAttackAnimation(direction);
 
           break;
@@ -302,11 +300,10 @@ export default class MainScene extends Phaser.Scene {
     this.debugText.prefix = this.debugText.prefix = `(${event.pos()!.x()},${event.pos()!.y()})`;
 
     this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), "hero1", "me");
-    this.sword = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me').setVisible(false);
+    this.interfaceCamera.ignore(this.player);
+
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
-
-    this.interfaceCamera.ignore([this.player, this.sword]);
 
     this.gridEngine.create(this.map, {
       characters: [
