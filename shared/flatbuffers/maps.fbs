@@ -1,13 +1,20 @@
 namespace WrathOfToldir.Maps;
 
+table TileCollision {
+    index: uint16;
+    direction: uint8;
+}
+
 table MapLayer {
     key: string;
     data: [uint16];
+    char_layer: string;
 }
 
 table TileSet {
     key: string;
     gid: uint16;
+    collisions: [TileCollision];
 }
 
 table TileMap {

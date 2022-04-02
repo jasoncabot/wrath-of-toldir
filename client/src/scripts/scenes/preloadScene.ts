@@ -17,7 +17,8 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.spritesheet('walls', 'assets/spritesheets/Tilesets/Rural Village Walls48.png', { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('water', 'assets/spritesheets/Tilesets/Rural Village Water48.png', { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('windows', 'assets/spritesheets/Tilesets/Rural Village Doors Windows48.png', { frameWidth: 48, frameHeight: 48 });
-
+    this.load.spritesheet('collisions', 'assets/spritesheets/Tilesets/Collisions.png', { frameWidth: 48, frameHeight: 48 });
+    
     this.load.spritesheet('hero1', 'assets/spritesheets/Sprites/Heroes/Hero 01 48.png', { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('sword', 'assets/spritesheets/Sprites/Weapons/sword-01.png', { frameWidth: 144, frameHeight: 144 });
     this.load.spritesheet('slime1', 'assets/spritesheets/Sprites/Monsters/Slime 01 48.png', { frameWidth: 48, frameHeight: 48 });

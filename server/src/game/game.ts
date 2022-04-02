@@ -16,18 +16,25 @@ export interface ReceivedCommand {
 export interface MapDataLayer {
     key: string
     data: number[]
+    charLayer: string | undefined
+}
+
+export interface MapTileSetCollision {
+    index: number
+    directions: number // 0b00000000 (none) to 0b11111111 (all)
 }
 
 export interface MapTileSet {
     key: string
     gid: number
+    collisions: MapTileSetCollision[]
 }
 
 export interface TiledJSON {
-    layers: MapDataLayer[]
-    tilesets: MapTileSet[]
     width: number
     height: number
+    layers: MapDataLayer[]
+    tilesets: MapTileSet[]
 }
 
 export interface NPC {

@@ -42,9 +42,10 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
       speed: 2,
       startPosition: { x, y },
       collides: {
-        collisionGroups: [],
+        collisionGroups: []
       },
-      facingDirection: Direction.DOWN
+      facingDirection: Direction.DOWN,
+      charLayer: "charLevel1"
     }
     this.canAttack = true;
     this.walkingState = "stand";

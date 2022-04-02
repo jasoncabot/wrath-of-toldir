@@ -13,7 +13,7 @@ import Weapon from '../objects/weapon';
 import WebSocketClient from '@gamestdio/websocket';
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
-import { MapLayer, TileSet } from '../../models/maps';
+import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import Monster, { MonsterTexture } from '../objects/monster';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
@@ -262,10 +262,16 @@ export default class MainScene extends Phaser.Scene {
     // Create the images that are displayed for each layer of our map
     // This is the first thing we expect to get after joining a game
     const tilesetLayers: Phaser.Tilemaps.Tileset[] = [];
+    const tileIndexCollisionMap: Record<number, number> = {};
     for (let i = 0; i < map.tilesetsLength(); i++) {
-      const x: TileSet = map.tilesets(i, new TileSet())!;
-      const terrain = this.map.addTilesetImage(x.key()!, x.key()!, undefined, undefined, undefined, undefined, x.gid());
-      tilesetLayers.push(terrain);
+      const tilesetData: TileSet = map.tilesets(i, new TileSet())!;
+      const tileset = this.map.addTilesetImage(tilesetData.key()!, tilesetData.key()!, undefined, undefined, undefined, undefined, tilesetData.gid());
+
+      for (let k = 0; k < tilesetData.collisionsLength(); k++) {
+        const tileCollision = tilesetData.collisions(k, new TileCollision())!;
+        tileIndexCollisionMap[tileCollision.index()] = tileCollision.direction();
+      }
+      tilesetLayers.push(tileset);
     }
 
     // create the data for every layer
@@ -279,11 +285,34 @@ export default class MainScene extends Phaser.Scene {
         height: map.height()!
       });
 
+      const charLayer = layer.charLayer();
+      if (charLayer && charLayer.length > 0) {
+        layerData.properties.push({
+          name: 'ge_charLayer',
+          type: 'string',
+          value: charLayer
+        });
+      }
+
       // our FlatBuffer gives us a 1D array of the map tiles, our map graphics expect a 2D array
       layerData.data = Array(map.height()!).fill(null).map((_, y) => Array(map.width()!).fill(null).map((_, x) => {
         const positionIndex = (map.width()! * y) + x;
         const tileIndex = layer.data(positionIndex)!;
-        return new Phaser.Tilemaps.Tile(layerData, tileIndex, x, y, 48, 48, 48, 48);
+
+        const tile = new Phaser.Tilemaps.Tile(layerData, tileIndex, x, y, 48, 48, 48, 48);
+
+        const collider: number | undefined = tileIndexCollisionMap[tileIndex];
+        if (collider) {
+          if ((collider & 0b10000000) === 0b10000000) tile.properties['ge_collide_up'] = true;
+          if ((collider & 0b01000000) === 0b01000000) tile.properties['ge_collide_down'] = true;
+          if ((collider & 0b00100000) === 0b00100000) tile.properties['ge_collide_left'] = true;
+          if ((collider & 0b00010000) === 0b00010000) tile.properties['ge_collide_right'] = true;
+          if ((collider & 0b00001000) === 0b00001000) tile.properties['ge_collide_up-left'] = true;
+          if ((collider & 0b00000100) === 0b00000100) tile.properties['ge_collide_up-right'] = true;
+          if ((collider & 0b00000010) === 0b00000010) tile.properties['ge_collide_down-left'] = true;
+          if ((collider & 0b00000001) === 0b00000001) tile.properties['ge_collide_down-right'] = true;
+        }
+        return tile;
       }));
 
       dataLayers.push(layerData);
@@ -294,6 +323,8 @@ export default class MainScene extends Phaser.Scene {
     for (let i = 0; i < map.layersLength(); i++) {
       const layer = map.layers(i, new MapLayer())!;
       const tileDisplayLayer = this.map.createLayer(layer.key()!, tilesetLayers, 0, 0);
+      // HACK - just for debugging - won't always be called ground on a map
+      if (layer.key() == "charLevel1") tileDisplayLayer.setAlpha(0.3).setVisible(false);
       this.interfaceCamera.ignore(tileDisplayLayer);
     }
 

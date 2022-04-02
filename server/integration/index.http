@@ -1,8 +1,14 @@
 ### Show map fairweather
-GET http://127.0.0.1:8787/api/map/fairweather
+# @name show
+GET http://127.0.0.1:8787/api/map/fisherswatch
 Content-type: application/json
+Authorization: Bearer {{$guid}}
 
-### 
-POST http://127.0.0.1:8787/api/map/fairweather/connection
+### Connect WebSocket
+
+@token = {{show.response.body.*}}
+
+# @name connect
+GET http://127.0.0.1:8787/api/map/fisherswatch/connection?token={{token}}
 Content-type: application/json
 Upgrade: websocket

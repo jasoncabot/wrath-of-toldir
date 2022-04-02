@@ -2,6 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { TileCollision } from '../../wrath-of-toldir/maps/tile-collision';
+
+
 export class TileSet {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -32,8 +35,18 @@ gid():number {
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
+collisions(index: number, obj?:TileCollision):TileCollision|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? (obj || new TileCollision()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+collisionsLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
 static startTileSet(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 }
 
 static addKey(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset) {
@@ -44,15 +57,32 @@ static addGid(builder:flatbuffers.Builder, gid:number) {
   builder.addFieldInt16(1, gid, 0);
 }
 
+static addCollisions(builder:flatbuffers.Builder, collisionsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, collisionsOffset, 0);
+}
+
+static createCollisionsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startCollisionsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
 static endTileSet(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createTileSet(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset, gid:number):flatbuffers.Offset {
+static createTileSet(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset, gid:number, collisionsOffset:flatbuffers.Offset):flatbuffers.Offset {
   TileSet.startTileSet(builder);
   TileSet.addKey(builder, keyOffset);
   TileSet.addGid(builder, gid);
+  TileSet.addCollisions(builder, collisionsOffset);
   return TileSet.endTileSet(builder);
 }
 }

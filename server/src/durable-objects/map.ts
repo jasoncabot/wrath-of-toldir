@@ -11,6 +11,7 @@ import { findAttackWitnesses, findJoinWitnesses, findMovementWitnesses } from "@
 import { loadMapData, validMaps } from "@/data/maps";
 import { v4 as uuidv4 } from 'uuid';
 import { getEntityPosition, setEntityPosition } from "@/game/components/positions";
+import { TileCollision } from "@/models/wrath-of-toldir/maps/tile-collision";
 
 export type MapAction = 'store-key' | 'websocket';
 
@@ -346,14 +347,20 @@ export class Map implements DurableObject {
 
         const { builder, eventOffsets, eventTypeOffsets } = buffer;
 
+        // TODO: can we load the (static) map data earlier and just merge the byte buffer here
+        // rather than re-creating each time to save on copying bits around - probably!
+
         const layerOffsets = this.mapData.layers.map(layer => {
             const mapKeyOffset = builder.createString(layer.key);
+            const charLayerOffset = builder.createString(layer.charLayer);
             const dataOffset = MapLayer.createDataVector(builder, layer.data);
-            return MapLayer.createMapLayer(builder, mapKeyOffset, dataOffset);
+            return MapLayer.createMapLayer(builder, mapKeyOffset, dataOffset, charLayerOffset);
         });
         const tilesetOffsets = this.mapData.tilesets.map(set => {
             const mapKeyOffset = builder.createString(set.key);
-            return TileSet.createTileSet(builder, mapKeyOffset, set.gid);
+            const tileCollisionOffsets = set.collisions.map(c => TileCollision.createTileCollision(builder, c.index, c.directions));
+            const collisionsOffset = TileSet.createCollisionsVector(builder, tileCollisionOffsets);
+            return TileSet.createTileSet(builder, mapKeyOffset, set.gid, collisionsOffset);
         });
         const layersVector = TileMap.createLayersVector(builder, layerOffsets);
         const tilesetsVector = TileMap.createTilesetsVector(builder, tilesetOffsets);
@@ -376,9 +383,9 @@ export class Map implements DurableObject {
         MapJoinedEvent.startMapJoinedEvent(builder);
         MapJoinedEvent.addPos(builder, Vec3.createVec3(builder, playerPosition.x, playerPosition.y, playerPosition.z));
         MapJoinedEvent.addTilemap(builder, tilemapOffset);
-
         MapJoinedEvent.addNpcs(builder, npcsVector);
         const eventOffset = MapJoinedEvent.endMapJoinedEvent(builder);
+
         eventOffsets.push(eventOffset);
         eventTypeOffsets.push(Update.MapJoinedEvent);
     }

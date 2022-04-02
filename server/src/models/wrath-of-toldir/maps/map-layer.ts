@@ -42,8 +42,15 @@ dataArray():Uint16Array|null {
   return offset ? new Uint16Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
+charLayer():string|null
+charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+charLayer(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
 static startMapLayer(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 }
 
 static addKey(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset) {
@@ -71,15 +78,20 @@ static startDataVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(2, numElems, 2);
 }
 
+static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, charLayerOffset, 0);
+}
+
 static endMapLayer(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createMapLayer(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset, dataOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createMapLayer(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset, dataOffset:flatbuffers.Offset, charLayerOffset:flatbuffers.Offset):flatbuffers.Offset {
   MapLayer.startMapLayer(builder);
   MapLayer.addKey(builder, keyOffset);
   MapLayer.addData(builder, dataOffset);
+  MapLayer.addCharLayer(builder, charLayerOffset);
   return MapLayer.endMapLayer(builder);
 }
 }

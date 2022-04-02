@@ -36,7 +36,8 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
             collides: {
                 collisionGroups: [],
             },
-            facingDirection: Direction.DOWN
+            facingDirection: Direction.DOWN,
+            charLayer: "charLevel1"
         }
         this.hp = hp;
         this.walkingState = "stand";
