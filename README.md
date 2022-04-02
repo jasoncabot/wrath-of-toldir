@@ -4,16 +4,21 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 
 ## TODO List
 
-- [X] Add NPC characters that just amble about
-- [X] Add an attack action
+- [ ] Spawning of players and monsters should not be on an invalid tile
+- [ ] Joining a map should only tell you about stuff you can see (so not all people / npcs and their positions)
+- [ ] Transfer player between maps (zones)
+- [ ] Combat system should hold HP, ATK, DEF e.t.c
 - [ ] Attacks should kill NPC
+- [ ] NPCs should have some kind of basic AI
+- [ ] Item system should hold inventory
 - [ ] Loot items
 - [ ] HUD
-- [ ] Transfer player between maps
+- [ ] Water should be animated
+- [X] Add NPC characters that just amble about
+- [X] Add an attack action
 - [X] Maps should share tiles
 - [X] Events should trigger animations
-- [ ] Water should be animated
-- [ ] Tile Collisions
+- [X] Tile Collisions
 
 ## Development
 
