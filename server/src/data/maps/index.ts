@@ -1,6 +1,6 @@
 import { MapDataLayer, MapTileSet, MapTileSetCollision, TiledJSON } from '@/game/game';
 import fisherswatch from './fisherswatch.json';
-import testroom1 from './fisherswatch.json';
+import testroom1 from './testroom1.json';
 
 const maps: Record<string, any> = {
     fisherswatch,
@@ -66,6 +66,7 @@ export const loadMapData = (mapId: string) => {
     const map = maps[mapId];
     if (!map) throw new Error("No map found with id");
     return {
+        id: mapId,
         layers: map.layers.map((layer: any) => {
             return {
                 key: layer.name,
@@ -76,8 +77,7 @@ export const loadMapData = (mapId: string) => {
         tilesets: parseTileSets(map),
         width: map.width,
         height: map.height
-    }
-
+    } as TiledJSON;
 }
 
 export const validMaps = new Set(Object.keys(maps));

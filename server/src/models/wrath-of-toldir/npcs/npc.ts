@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { Vec3 } from '../../wrath-of-toldir/vec3';
+import { Vec2 } from '../../wrath-of-toldir/vec2';
 
 
 export class Npc {
@@ -35,18 +35,25 @@ texture(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-pos(obj?:Vec3):Vec3|null {
+pos(obj?:Vec2):Vec2|null {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? (obj || new Vec3()).__init(this.bb_pos + offset, this.bb!) : null;
+  return offset ? (obj || new Vec2()).__init(this.bb_pos + offset, this.bb!) : null;
+}
+
+charLayer():string|null
+charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+charLayer(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
 hp():number {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 static startNpc(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -61,8 +68,12 @@ static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
   builder.addFieldStruct(2, posOffset, 0);
 }
 
+static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, charLayerOffset, 0);
+}
+
 static addHp(builder:flatbuffers.Builder, hp:number) {
-  builder.addFieldInt16(3, hp, 0);
+  builder.addFieldInt16(4, hp, 0);
 }
 
 static endNpc(builder:flatbuffers.Builder):flatbuffers.Offset {

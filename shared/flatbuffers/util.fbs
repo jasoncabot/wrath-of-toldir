@@ -1,7 +1,6 @@
 namespace WrathOfToldir;
 
-struct Vec3 {
+struct Vec2 {
   x:short;
   y:short;
-  z:short;
 }

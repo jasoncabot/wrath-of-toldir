@@ -3,7 +3,7 @@ include "events.fbs";
 namespace WrathOfToldir.Commands;
 
 table MoveCommand {
-    pos: Vec3;
+    pos: Vec2;
 }
 
 table JoinCommand {

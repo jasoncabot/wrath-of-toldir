@@ -4,7 +4,7 @@ import { DebugText, PlayerCharacter } from '../objects/'
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
 import { AttackEvent, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
-import { MoveCommand, JoinCommand, Action, Vec3 } from '../../models/commands';
+import { MoveCommand, JoinCommand, Action, Vec2 } from '../../models/commands';
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
@@ -14,6 +14,7 @@ import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-e
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import Monster, { MonsterTexture } from '../objects/monster';
+import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed-event';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -56,6 +57,7 @@ export default class MainScene extends Phaser.Scene {
   connection: WebSocket | undefined;
   commandSequencer: number;
   currentState = MapSceneState.INITIAL;
+  chatOverlay: Phaser.GameObjects.DOMElement | undefined
 
   constructor() {
     super({ key: 'MainScene' });
@@ -67,6 +69,8 @@ export default class MainScene extends Phaser.Scene {
     Monster.preload(this, "slime1");
     PlayerCharacter.preload(this, "hero1");
     Weapon.preload(this);
+
+    this.load.html('chatbox', 'assets/html/chatbox.html');
   }
 
   async create() {
@@ -77,7 +81,13 @@ export default class MainScene extends Phaser.Scene {
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
     this.cameras.main.ignore([this.debugText, hud]);
 
-    this.transitionToInitial();
+    this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
+      if (!this.chatOverlay && event.keyCode == Phaser.Input.Keyboard.KeyCodes.FORWARD_SLASH) {
+        this.showInputDialog();
+      }
+    });
+
+    this.transitionToInitial("fisherswatch");
   }
 
   update() {
@@ -89,6 +99,45 @@ export default class MainScene extends Phaser.Scene {
       if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
         this.applyDefaultAction();
       }
+    }
+  }
+
+  showInputDialog() {
+    this.chatOverlay = this.add.dom(0, 576)
+      .createFromCache('chatbox')
+      .addListener('submit')
+      .setOrigin(0, 0);
+
+    this.input.keyboard.enabled = false;
+    this.input.keyboard.disableGlobalCapture();
+
+    this.chatOverlay.on('submit', _ => {
+      this.input.keyboard.enabled = true;
+      this.input.keyboard.enableGlobalCapture();
+      const message = (document.getElementById('chatmessage') as HTMLInputElement).value;
+      this.onTextEntered(message);
+      this.chatOverlay?.destroy();
+      this.chatOverlay = undefined;
+    });
+
+    document.getElementById('chatmessage')?.focus();
+    this.tweens.add({
+      targets: this.chatOverlay,
+      y: 540,
+      duration: 250,
+      ease: 'Power3'
+    });
+  }
+
+  onTextEntered(text: string) {
+    // TODO: parse text and send appropriate event to server 
+    // ChatEvent
+    // CommandEvent
+    // * /g 1:1 = move to space (1, 1)
+    if (text.startsWith("/g")) {
+      // just move us locally - this should tell the server we want to move
+      const [x, y] = text.split(" ")[1].split(":");
+      this.gridEngine.setPosition("me", { x: parseInt(x, 10), y: parseInt(y, 10) }, this.gridEngine.getCharLayer('me'));
     }
   }
 
@@ -126,8 +175,10 @@ export default class MainScene extends Phaser.Scene {
       this.applyUpdate(EventLog.getRootAsEventLog(bb));
     };
     ws.onclose = async (event: CloseEvent) => {
-      console.log("Socket closed ... ");
-      this.transitionToInitial();
+      console.log(`Socket closed (${event.code}) ... `);
+      if (event.code !== 1000) { // considered a normal, clean exit, then try to reconnect
+        this.transitionToInitial(mapId);
+      }
     };
     ws.onerror = async (event: Event) => {
       console.log("Socket error ..." + event);
@@ -184,14 +235,14 @@ export default class MainScene extends Phaser.Scene {
           if (onScreen) {
             this.gridEngine.moveTo(move.key().toString(), { x: move.pos()!.x(), y: move.pos()!.y() });
           } else {
-            this.gridEngine.setPosition(move.key().toString(), { x: move.pos()!.x(), y: move.pos()!.y() });
+            this.gridEngine.setPosition(move.key().toString(), { x: move.pos()!.x(), y: move.pos()!.y() }, this.gridEngine.getCharLayer(move.key().toString()));
           }
           break;
         }
         case Update.JoinEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
-          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), "hero1", join.key().toString());
+          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), join.charLayer()!, "hero1", join.key().toString());
           pc.setData("name", join.name());
           this.gridEngine.addCharacter(pc.gridEngineCharacterData);
           pc.playStandAnimation(this.gridEngine.getFacingDirection(join.key().toString()));
@@ -226,23 +277,30 @@ export default class MainScene extends Phaser.Scene {
           this.transitionToReady(event);
           break;
         }
+        case Update.MapChangedEvent: {
+          const event: MapChangedEvent = update.events(i, new MapChangedEvent());
+          this.transitionToInitial(event.id()!);
+          break;
+        }
       }
     }
   }
 
-  async transitionToInitial() {
+  async transitionToInitial(mapId: string) {
+    this.currentState = MapSceneState.INITIAL;
+
     // Remove old sprites
     [this.map, this.player, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
     this.children.list.filter(child => {
       if (child instanceof PlayerCharacter && child != this.player) return true;
-      if (child instanceof Weapon && child != this.player.weaponSprite) return true;
+      if (child instanceof Weapon) return true;
+      if (child instanceof Monster) return true;
       return false;
     }).forEach(x => x.destroy());
 
     // Create our connection to the server
-    this.connection = await this.openWebSocket("fisherswatch");
-
-    this.currentState = MapSceneState.INITIAL;
+    this.connection?.close(1000);
+    this.connection = await this.openWebSocket(mapId);
   }
 
   transitionToJoined() {
@@ -326,7 +384,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.debugText.prefix = this.debugText.prefix = `(${event.pos()!.x()},${event.pos()!.y()})`;
 
-    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), "hero1", "me");
+    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), event.charLayer()!, "hero1", "me");
     this.interfaceCamera.ignore(this.player);
 
     this.cameras.main.startFollow(this.player, true);
@@ -341,7 +399,7 @@ export default class MainScene extends Phaser.Scene {
 
     for (let i = 0; i < event.npcsLength(); i++) {
       const npc = event.npcs(i)!;
-      const sprite = new Monster(this, npc.pos()!.x(), npc.pos()!.y(), npc.texture()! as MonsterTexture, npc.key().toString(), npc.hp());
+      const sprite = new Monster(this, npc.pos()!.x(), npc.pos()!.y(), npc.charLayer()!, npc.texture()! as MonsterTexture, npc.key().toString(), npc.hp());
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
       this.interfaceCamera.ignore(sprite);
@@ -358,7 +416,7 @@ export default class MainScene extends Phaser.Scene {
       let builder = new Builder(64);
 
       MoveCommand.startMoveCommand(builder);
-      MoveCommand.addPos(builder, Vec3.createVec3(builder, enterTile.x, enterTile.y, 0)); // TODO: get z
+      MoveCommand.addPos(builder, Vec2.createVec2(builder, enterTile.x, enterTile.y));
       const movement = MoveCommand.endMoveCommand(builder);
 
       Command.startCommand(builder);

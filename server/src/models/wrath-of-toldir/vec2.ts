@@ -2,10 +2,10 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-export class Vec3 {
+export class Vec2 {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
-__init(i:number, bb:flatbuffers.ByteBuffer):Vec3 {
+__init(i:number, bb:flatbuffers.ByteBuffer):Vec2 {
   this.bb_pos = i;
   this.bb = bb;
   return this;
@@ -19,17 +19,12 @@ y():number {
   return this.bb!.readInt16(this.bb_pos + 2);
 }
 
-z():number {
-  return this.bb!.readInt16(this.bb_pos + 4);
-}
-
 static sizeOf():number {
-  return 6;
+  return 4;
 }
 
-static createVec3(builder:flatbuffers.Builder, x: number, y: number, z: number):flatbuffers.Offset {
-  builder.prep(2, 6);
-  builder.writeInt16(z);
+static createVec2(builder:flatbuffers.Builder, x: number, y: number):flatbuffers.Offset {
+  builder.prep(2, 4);
   builder.writeInt16(y);
   builder.writeInt16(x);
   return builder.offset();

@@ -30,7 +30,7 @@ tag = "v1"
 new_classes = ["Map"]
 
 [vars]
-FRONTEND_URI="http://localhost:8080"
+FRONTEND_URI="http://192.168.1.40:8080"
 
 [env.production]
 name = "wrath-of-toldir-server"

@@ -24,7 +24,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
     hp: number;
     walkingState: "walk" | "stand" | "attack";
 
-    constructor(scene: Phaser.Scene, x: number, y: number, texture: MonsterTexture, identifier: string, hp: number) {
+    constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: MonsterTexture, identifier: string, hp: number) {
         super(scene, 0, 0, texture, 0);
         this.identifier = identifier;
         this.monsterTexture = texture;
@@ -37,7 +37,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
                 collisionGroups: [],
             },
             facingDirection: Direction.DOWN,
-            charLayer: "charLevel1"
+            charLayer: z
         }
         this.hp = hp;
         this.walkingState = "stand";

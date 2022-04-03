@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { Vec3 } from '../../wrath-of-toldir/vec3';
+import { Vec2 } from '../../wrath-of-toldir/vec2';
 
 
 export class MoveEvent {
@@ -28,13 +28,20 @@ key():number {
   return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
 }
 
-pos(obj?:Vec3):Vec3|null {
+pos(obj?:Vec2):Vec2|null {
   const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? (obj || new Vec3()).__init(this.bb_pos + offset, this.bb!) : null;
+  return offset ? (obj || new Vec2()).__init(this.bb_pos + offset, this.bb!) : null;
+}
+
+charLayer():string|null
+charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+charLayer(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
 static startMoveEvent(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -43,6 +50,10 @@ static addKey(builder:flatbuffers.Builder, key:number) {
 
 static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
   builder.addFieldStruct(1, posOffset, 0);
+}
+
+static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, charLayerOffset, 0);
 }
 
 static endMoveEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

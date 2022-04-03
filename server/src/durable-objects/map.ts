@@ -1,6 +1,6 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
-import { JoinEvent, LeaveEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec3 } from "@/models/events";
+import { JoinEvent, LeaveEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Action, AttackCommand, JoinCommand, LeaveCommand, MoveCommand } from "@/models/commands";
 import { AttackEvent } from "@/models/wrath-of-toldir/events/attack-event";
@@ -12,6 +12,7 @@ import { loadMapData, validMaps } from "@/data/maps";
 import { v4 as uuidv4 } from 'uuid';
 import { getEntityPosition, setEntityPosition } from "@/game/components/positions";
 import { TileCollision } from "@/models/wrath-of-toldir/maps/tile-collision";
+import { MapChangedEvent } from "@/models/wrath-of-toldir/events/map-changed-event";
 
 export type MapAction = 'store-key' | 'websocket';
 
@@ -57,7 +58,7 @@ export class Map implements DurableObject {
             setEntityPosition(npcId, {
                 x: Math.floor(Math.random() * this.mapData.width),
                 y: Math.floor(Math.random() * this.mapData.height),
-                z: 0
+                z: 'charLevel1'
             });
         }
     }
@@ -143,7 +144,7 @@ export class Map implements DurableObject {
 
         const players: PlayerId[] = Object.keys(this.connections);
         this.commandQueue.forEach(({ playerId, command }) => {
-            console.log(`[tick:${this.tickCount}] [${playerId}:${command.seq()}] ${Action[command.actionType()]}`);
+            console.log(`[id:${this.mapData?.id}] [tick:${this.tickCount}] [${playerId}:${command.seq()}] ${Action[command.actionType()]}`);
 
             let player = this.connections[playerId].player;
             if (!player && command.actionType() !== Action.JoinCommand) {
@@ -159,17 +160,37 @@ export class Map implements DurableObject {
                     // update game state
                     const pos = getEntityPosition(playerId);
                     const oldPos = { ...pos };
+
+                    // update game state
+
+                    // check if this new position should move us to a new zone
+                    if (move.pos()!.x() == 80 && move.pos()!.y() == 28) {
+                        // zone transition to testroom1
+                        // update game state
+                        const playerWhoLeft = findEventStore(playerId);
+
+                        const newMapIdOffset = playerWhoLeft.builder.createString("testroom1");
+                        const mapChangedEventOffset = MapChangedEvent.createMapChangedEvent(playerWhoLeft.builder, newMapIdOffset);
+                        playerWhoLeft.eventOffsets.push(mapChangedEventOffset);
+                        playerWhoLeft.eventTypeOffsets.push(Update.MapChangedEvent);
+
+                        // skip processing a normal move
+                        break;
+                    }
+
                     pos.x = move.pos()!.x();
                     pos.y = move.pos()!.y();
-                    pos.z = move.pos()!.z();
 
                     // inform other players
                     findMovementWitnesses(playerId, players, oldPos, pos, (id: PlayerId) => {
                         const { builder, eventOffsets, eventTypeOffsets } = findEventStore(id);
 
+                        const charLayerOffset = builder.createString(pos.z);
+
                         MoveEvent.startMoveEvent(builder);
                         MoveEvent.addKey(builder, player!.key);
-                        MoveEvent.addPos(builder, Vec3.createVec3(builder, pos.x, pos.y, pos.z));
+                        MoveEvent.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y));
+                        MoveEvent.addCharLayer(builder, charLayerOffset);
                         eventOffsets.push(MoveEvent.endMoveEvent(builder));
                         eventTypeOffsets.push(Update.MoveEvent);
                     });
@@ -188,7 +209,7 @@ export class Map implements DurableObject {
                     setEntityPosition(playerId, {
                         x: Math.floor(Math.random() * this.mapData!.width),
                         y: Math.floor(Math.random() * this.mapData!.height),
-                        z: 0
+                        z: 'charLevel1'
                     });
 
                     // inform other players
@@ -203,42 +224,44 @@ export class Map implements DurableObject {
                         if (otherPlayer) {
                             const otherPlayerPos = getEntityPosition(otherPlayerId);
                             const otherPlayerName = joined.builder.createString(otherPlayer.name);
+                            const charLayerOffset = builder.createString(otherPlayerPos.z);
                             JoinEvent.startJoinEvent(joined.builder);
                             JoinEvent.addKey(joined.builder, otherPlayer.key);
                             JoinEvent.addName(joined.builder, otherPlayerName);
-                            JoinEvent.addPos(joined.builder, Vec3.createVec3(joined.builder, otherPlayerPos.x, otherPlayerPos.y, otherPlayerPos.z));
+                            JoinEvent.addCharLayer(builder, charLayerOffset);
+                            JoinEvent.addPos(joined.builder, Vec2.createVec2(joined.builder, otherPlayerPos.x, otherPlayerPos.y));
                             joined.eventOffsets.push(JoinEvent.endJoinEvent(joined.builder));
                             joined.eventTypeOffsets.push(Update.JoinEvent);
                         }
 
                         const nameOffset = builder.createString(player!.name);
+                        const charLayerOffset = builder.createString(playerPos.z);
 
                         JoinEvent.startJoinEvent(builder);
                         JoinEvent.addKey(builder, player!.key);
                         JoinEvent.addName(builder, nameOffset);
-                        JoinEvent.addPos(builder, Vec3.createVec3(builder, playerPos.x, playerPos.y, playerPos.z));
+                        JoinEvent.addCharLayer(builder, charLayerOffset);
+                        JoinEvent.addPos(builder, Vec2.createVec2(builder, playerPos.x, playerPos.y));
                         eventOffsets.push(JoinEvent.endJoinEvent(builder));
                         eventTypeOffsets.push(Update.JoinEvent);
                     });
                     break;
                 }
                 case Action.LeaveCommand: {
-                    // read client action
-                    const leave: LeaveEvent = command.action(new LeaveCommand());
+                    // we don't need to read client action here, we know that player.id is leaving
 
                     // update game state
                     delete this.connections[playerId];
 
-                    if (players.length === 0) {
+                    if (Object.keys(this.connections).length === 0) {
                         // no one is connected, no point to carry on ticking
-                        console.log('No players are connected, shutting down game tick ...');
+                        console.log(`[id:${this.mapData?.id}] No players are connected, shutting down game tick ...`);
                         this.onGameEmpty();
                     } else {
                         // inform other players
                         players.forEach(otherPlayerId => {
                             if (otherPlayerId == playerId) return;
                             const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
-
                             eventOffsets.push(LeaveEvent.createLeaveEvent(builder, player!.key));
                             eventTypeOffsets.push(Update.LeaveEvent);
                         });
@@ -292,9 +315,12 @@ export class Map implements DurableObject {
                 findMovementWitnesses(npcId, players, oldPos, pos, otherPlayerId => {
                     const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
 
+                    const charLayerOffset = builder.createString(pos.z);
+
                     MoveEvent.startMoveEvent(builder);
                     MoveEvent.addKey(builder, key);
-                    MoveEvent.addPos(builder, Vec3.createVec3(builder, pos.x, pos.y, pos.z));
+                    MoveEvent.addCharLayer(builder, charLayerOffset);
+                    MoveEvent.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y));
                     eventOffsets.push(MoveEvent.endMoveEvent(builder));
                     eventTypeOffsets.push(Update.MoveEvent);
                 });
@@ -370,18 +396,22 @@ export class Map implements DurableObject {
             const npc = this.npcs[npcId];
             const pos = getEntityPosition(npcId);
             const textureOffset = builder.createString(npc.type);
+            const charLayerOffset = builder.createString(pos.z);
             NPCBuilder.startNpc(builder);
             NPCBuilder.addKey(builder, npc.key);
             NPCBuilder.addTexture(builder, textureOffset);
-            NPCBuilder.addPos(builder, Vec3.createVec3(builder, pos.x, pos.y, pos.z))
+            NPCBuilder.addCharLayer(builder, charLayerOffset);
+            NPCBuilder.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y))
             NPCBuilder.addHp(builder, npc.hp);
             return NPCBuilder.endNpc(builder);
         })
         const npcsVector = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
 
         const playerPosition = getEntityPosition(playerId);
+        const charLayerOffset = builder.createString(playerPosition.z);
         MapJoinedEvent.startMapJoinedEvent(builder);
-        MapJoinedEvent.addPos(builder, Vec3.createVec3(builder, playerPosition.x, playerPosition.y, playerPosition.z));
+        MapJoinedEvent.addCharLayer(builder, charLayerOffset);
+        MapJoinedEvent.addPos(builder, Vec2.createVec2(builder, playerPosition.x, playerPosition.y));
         MapJoinedEvent.addTilemap(builder, tilemapOffset);
         MapJoinedEvent.addNpcs(builder, npcsVector);
         const eventOffset = MapJoinedEvent.endMapJoinedEvent(builder);
@@ -393,7 +423,7 @@ export class Map implements DurableObject {
     async handleSession(socket: WebSocket, playerId: PlayerId) {
         // Well this is our main game loop
         if (!this.intervalHandle) {
-            console.log(`Player connected, starting up game tick ...`);
+            console.log(`[id:${this.mapData?.id}] Player connected, starting up game tick ...`);
             this.intervalHandle = setInterval(this.onGameTick.bind(this), TICK_RATE);
         }
 

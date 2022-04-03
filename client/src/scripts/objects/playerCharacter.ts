@@ -32,7 +32,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   weaponSprite: Weapon | undefined;
   walkingState: "walk" | "stand" | "attack";
 
-  constructor(scene: Phaser.Scene, x: number, y: number, texture: SpriteTexture, identifier: string) {
+  constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: SpriteTexture, identifier: string) {
     super(scene, 0, 0, texture, 0);
     this.identifier = identifier;
     this.spriteTexture = texture;
@@ -45,7 +45,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
         collisionGroups: []
       },
       facingDirection: Direction.DOWN,
-      charLayer: "charLevel1"
+      charLayer: z
     }
     this.canAttack = true;
     this.walkingState = "stand";

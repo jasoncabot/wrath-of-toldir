@@ -6,13 +6,15 @@ namespace WrathOfToldir.Events;
 
 table MoveEvent {
     key: int32;
-    pos: Vec3;
+    pos: Vec2;
+    char_layer: string;
 }
 
 table JoinEvent {
     key: int32;
-    pos: Vec3;
+    pos: Vec2;
     name: string;
+    char_layer: string;
 }
 
 table LeaveEvent {
@@ -25,9 +27,14 @@ table AttackEvent {
 }
 
 table MapJoinedEvent {
-    pos: Vec3;
+    pos: Vec2;
+    char_layer: string;
     tilemap: WrathOfToldir.Maps.TileMap;
     npcs: [WrathOfToldir.Npcs.Npc];
+}
+
+table MapChangedEvent {
+    id: string;
 }
 
 union Update { 
@@ -36,6 +43,7 @@ union Update {
     LeaveEvent,
     AttackEvent,
     MapJoinedEvent,
+    MapChangedEvent
 }
 
 table EventLog {

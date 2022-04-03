@@ -31,6 +31,7 @@ export interface MapTileSet {
 }
 
 export interface TiledJSON {
+    id: string
     width: number
     height: number
     layers: MapDataLayer[]

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="48" tileheight="48" infinite="0" nextlayerid="6" nextobjectid="1">
+ <editorsettings>
+  <export target="../../server/src/data/maps/testroom1.json" format="json"/>
+ </editorsettings>
  <tileset firstgid="1" source="tilesets/floors.tsx"/>
  <tileset firstgid="241" source="tilesets/walls.tsx"/>
  <tileset firstgid="997" source="tilesets/decoration.tsx"/>
@@ -47,15 +50,15 @@
 0,0,0,0,1154,0,0,0,0,0
 </data>
  </layer>
- <layer id="3" name="charLayer1" width="10" height="10" opacity="0.41">
+ <layer id="3" name="charLevel1" width="10" height="10" opacity="0.41">
   <properties>
-   <property name="ge_charLayer" value="charLayer1"/>
+   <property name="ge_charLayer" value="charLevel1"/>
   </properties>
   <data encoding="csv">
 1284,1284,1284,1284,1284,1284,1284,1284,1284,1284,
 0,1284,1284,0,0,0,0,0,1284,0,
 0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,1298,0,0,0,
 0,0,0,0,0,0,1284,0,0,0,
 0,0,0,0,0,0,0,0,0,0,
 0,0,0,1284,0,0,0,0,0,0,

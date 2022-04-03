@@ -1,1 +1,1 @@
-export { Vec3 } from './wrath-of-toldir/vec3';
+export { Vec2 } from './wrath-of-toldir/vec2';

@@ -3,7 +3,7 @@ import { EntityId } from "../game"
 export interface Position {
     x: number
     y: number
-    z: number
+    z: string
 }
 
 let positions: Record<EntityId, Position> = {};

@@ -5,6 +5,7 @@ namespace WrathOfToldir.Npcs;
 table Npc {
     key: int32;
     texture: string;
-    pos: Vec3;
+    pos: Vec2;
+    char_layer: string;
     hp: uint16;
 }

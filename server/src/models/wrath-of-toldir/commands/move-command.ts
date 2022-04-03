@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { Vec3 } from '../../wrath-of-toldir/vec3';
+import { Vec2 } from '../../wrath-of-toldir/vec2';
 
 
 export class MoveCommand {
@@ -23,9 +23,9 @@ static getSizePrefixedRootAsMoveCommand(bb:flatbuffers.ByteBuffer, obj?:MoveComm
   return (obj || new MoveCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-pos(obj?:Vec3):Vec3|null {
+pos(obj?:Vec2):Vec2|null {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? (obj || new Vec3()).__init(this.bb_pos + offset, this.bb!) : null;
+  return offset ? (obj || new Vec2()).__init(this.bb_pos + offset, this.bb!) : null;
 }
 
 static startMoveCommand(builder:flatbuffers.Builder) {
