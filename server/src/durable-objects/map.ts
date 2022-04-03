@@ -24,7 +24,6 @@ export interface Connection {
 const TICK_RATE = 500;
 
 export class Map implements DurableObject {
-    socketKeys: Record<string, string>;
     connections: Record<PlayerId, Connection>;
     intervalHandle: number;
     commandQueue: ReceivedCommand[];
@@ -36,7 +35,6 @@ export class Map implements DurableObject {
         this.state = state;
         this.env = env;
 
-        this.socketKeys = {};
         this.connections = {};
         this.commandQueue = [];
         this.intervalHandle = 0;
@@ -74,22 +72,25 @@ export class Map implements DurableObject {
                     const [client, server] = Object.values(new WebSocketPair());
 
                     const mapId = request.headers.get('X-MapId')!;
-                    const socketKey = request.headers.get('X-Socket-Key');
+                    const socketKey = request.headers.get('X-Socket-Key')!;
 
                     // ensure that socketKey matches the key we stored earlier
-                    if (!socketKey || !this.socketKeys[socketKey]) {
+                    if (!socketKey) {
                         return new Response("expected key", { status: 400 });
+                    }
+                    const playerId = await this.state.storage.get(socketKey) as string;
+                    if (!playerId) {
+                        return new Response("invalid key", { status: 401 });
                     }
 
                     if (validMaps.has(mapId) && !this.mapData) {
                         this.initialiseMap(mapId);
                     }
 
-                    const playerId = this.socketKeys[socketKey];
                     await this.handleSession(server, playerId);
 
-                    // consume this token
-                    delete this.socketKeys[socketKey];
+                    // consume this token so it can't be re-used
+                    this.state.storage.delete(socketKey);
 
                     return new Response(null, {
                         status: 101,
@@ -104,7 +105,7 @@ export class Map implements DurableObject {
                 case "store-key": {
                     const playerId = request.headers.get('X-PlayerId')!;
                     const socketKey = request.headers.get('X-Socket-Key')!;
-                    this.socketKeys[socketKey] = playerId;
+                    await this.state.storage.put(socketKey, playerId);
                     return new Response(socketKey, {
                         status: 201,
                         headers: {
@@ -334,7 +335,6 @@ export class Map implements DurableObject {
     onGameEmpty() {
         clearInterval(this.intervalHandle);
         this.intervalHandle = 0;
-        this.socketKeys = {};
         this.tickCount = 0;
     }
 

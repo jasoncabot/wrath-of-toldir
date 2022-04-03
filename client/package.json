@@ -39,7 +39,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@gamestdio/websocket": "^0.3.2",
     "@types/uuid": "^8.3.4",
     "@types/webfontloader": "^1.6.34",
     "dotenv-webpack": "^7.1.0",

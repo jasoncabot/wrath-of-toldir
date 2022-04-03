@@ -8,9 +8,8 @@ import { MoveCommand, JoinCommand, Action, Vec3 } from '../../models/commands';
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
-import { SpriteTexture, WalkingAnimatable } from '../objects/playerCharacter';
+import { WalkingAnimatable } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
-import WebSocketClient from '@gamestdio/websocket';
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
@@ -54,7 +53,7 @@ export default class MainScene extends Phaser.Scene {
   map: Phaser.Tilemaps.Tilemap
   interfaceCamera: Phaser.Cameras.Scene2D.Camera;
   onPositionChangedSubscription: any;
-  connection: WebSocketClient;
+  connection: WebSocket | undefined;
   commandSequencer: number;
   currentState = MapSceneState.INITIAL;
 
@@ -78,8 +77,7 @@ export default class MainScene extends Phaser.Scene {
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
     this.cameras.main.ignore([this.debugText, hud]);
 
-    // Create our connection to the server
-    this.connection = await this.openWebSocket();
+    this.transitionToInitial();
   }
 
   update() {
@@ -94,25 +92,16 @@ export default class MainScene extends Phaser.Scene {
     }
   }
 
-  async openWebSocket() {
+  async openWebSocket(mapId: string) {
     // GET /api/map/name
     // to get an auth token and map id to to open a websocket
 
-    const mapId = "fisherswatch";
-    const apiURI = `${process.env.API_URI}/api/map/${mapId}`;
-    const response = await fetch(apiURI, { headers: { 'Authorization': `Bearer ${authToken()}` } });
-    if (!response) {
-      throw new Error("Failed to fetch WebSocket connection token. Do you have an auth token?");
-    }
-    const wsConnectionToken = await response.text();
+    const wsConnectionToken = await fetchConnectionToken(mapId);
 
     const wsURI = `${process.env.WS_URI}/api/map/${mapId}/connection?token=${wsConnectionToken}`;
     console.log(`Socket connecting ${wsURI} ...`);
 
-    const ws = new WebSocketClient(wsURI, [], {
-      backoff: "exponential",
-      initialDelay: 1
-    });
+    const ws = new WebSocket(wsURI, []);
     ws.onopen = (event: Event) => {
       console.log(`Socket connected ...`);
       let builder = new Builder(128);
@@ -129,35 +118,23 @@ export default class MainScene extends Phaser.Scene {
       builder.finish(update);
       ws.send(builder.asUint8Array());
 
-      this.currentState = MapSceneState.JOINED;
+      this.transitionToJoined();
     };
     ws.onmessage = async (msg: MessageEvent) => {
       const data: ArrayBuffer = await (msg.data as Blob).arrayBuffer();
       let bb = new ByteBuffer(new Uint8Array(data));
-
       this.applyUpdate(EventLog.getRootAsEventLog(bb));
     };
-    ws.onclose = (event: CloseEvent) => {
-      console.log("Socket closed ... Removing old sprites ...");
-      [this.map, this.player, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
-      this.children.list.filter(child => {
-        if (child instanceof PlayerCharacter && child != this.player) return true;
-        if (child instanceof Weapon && child != this.player.weaponSprite) return true;
-        return false;
-      }).forEach(x => x.destroy());
-      this.currentState = MapSceneState.INITIAL;
+    ws.onclose = async (event: CloseEvent) => {
+      console.log("Socket closed ... ");
+      this.transitionToInitial();
     };
-    ws.onerror = (event: Event) => {
-      console.log("Socket error ...");
+    ws.onerror = async (event: Event) => {
+      console.log("Socket error ..." + event);
+      ws.close();
     };
-    ws.onreconnect = (event: Event) => {
-      console.log("Socket reconnected ...");
-    }
 
     return ws;
-  }
-
-  addOrMoveCharacter(key: string, texture: SpriteTexture, position: Vec3, name: string | null) {
   }
 
   submitAttack() {
@@ -177,7 +154,7 @@ export default class MainScene extends Phaser.Scene {
     Command.addAction(builder, attack);
     const update = Command.endCommand(builder);
     builder.finish(update);
-    this.connection.send(builder.asUint8Array());
+    this.connection?.send(builder.asUint8Array());
   }
 
   applyDefaultAction() {
@@ -251,6 +228,25 @@ export default class MainScene extends Phaser.Scene {
         }
       }
     }
+  }
+
+  async transitionToInitial() {
+    // Remove old sprites
+    [this.map, this.player, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
+    this.children.list.filter(child => {
+      if (child instanceof PlayerCharacter && child != this.player) return true;
+      if (child instanceof Weapon && child != this.player.weaponSprite) return true;
+      return false;
+    }).forEach(x => x.destroy());
+
+    // Create our connection to the server
+    this.connection = await this.openWebSocket("fisherswatch");
+
+    this.currentState = MapSceneState.INITIAL;
+  }
+
+  transitionToJoined() {
+    this.currentState = MapSceneState.JOINED;
   }
 
   transitionToReady(event: MapJoinedEvent) {
@@ -371,7 +367,7 @@ export default class MainScene extends Phaser.Scene {
       Command.addAction(builder, movement);
       const update = Command.endCommand(builder);
       builder.finish(update);
-      this.connection.send(builder.asUint8Array());
+      this.connection?.send(builder.asUint8Array());
     });
 
     // Player Animations on movement
@@ -389,3 +385,12 @@ export default class MainScene extends Phaser.Scene {
     this.currentState = MapSceneState.READY;
   }
 }
+async function fetchConnectionToken(mapId: string) {
+  const apiURI = `${process.env.API_URI}/api/map/${mapId}`;
+  const response = await fetch(apiURI, { headers: { 'Authorization': `Bearer ${authToken()}` } });
+  if (!response) {
+    throw new Error("Failed to fetch WebSocket connection token. Do you have an auth token?");
+  }
+  return await response.text();
+}
+
