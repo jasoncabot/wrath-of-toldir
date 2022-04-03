@@ -1,9 +1,10 @@
 import { MapDataLayer, MapTileSet, MapTileSetCollision, TiledJSON } from '@/game/game';
-import { TileCollision } from '@/models/maps';
 import fisherswatch from './fisherswatch.json';
+import testroom1 from './fisherswatch.json';
 
 const maps: Record<string, any> = {
-    fisherswatch
+    fisherswatch,
+    testroom1
 }
 
 const toCollisionBitMask = (properties: { name: string, type: string, value: boolean }[]) => {
