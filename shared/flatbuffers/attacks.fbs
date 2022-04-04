@@ -1,0 +1,17 @@
+include "util.fbs";
+
+namespace WrathOfToldir.Attacks;
+
+table NormalAttack {
+    facing: uint8;
+}
+
+table MagicAttack {
+    target_key: uint32 = 0;
+    target_pos: Vec2;
+}
+
+union AttackData {
+    NormalAttack,
+    MagicAttack
+}

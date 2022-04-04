@@ -2,6 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { AttackData, unionToAttackData, unionListToAttackData } from '../../wrath-of-toldir/attacks/attack-data';
+
+
 export class AttackCommand {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -20,17 +23,26 @@ static getSizePrefixedRootAsAttackCommand(bb:flatbuffers.ByteBuffer, obj?:Attack
   return (obj || new AttackCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-facing():number {
+dataType():AttackData {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : AttackData.NONE;
+}
+
+data<T extends flatbuffers.Table>(obj:any):any|null {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.__union(obj, this.bb_pos + offset) : null;
 }
 
 static startAttackCommand(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
 }
 
-static addFacing(builder:flatbuffers.Builder, facing:number) {
-  builder.addFieldInt8(0, facing, 0);
+static addDataType(builder:flatbuffers.Builder, dataType:AttackData) {
+  builder.addFieldInt8(0, dataType, AttackData.NONE);
+}
+
+static addData(builder:flatbuffers.Builder, dataOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, dataOffset, 0);
 }
 
 static endAttackCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -38,9 +50,10 @@ static endAttackCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createAttackCommand(builder:flatbuffers.Builder, facing:number):flatbuffers.Offset {
+static createAttackCommand(builder:flatbuffers.Builder, dataType:AttackData, dataOffset:flatbuffers.Offset):flatbuffers.Offset {
   AttackCommand.startAttackCommand(builder);
-  AttackCommand.addFacing(builder, facing);
+  AttackCommand.addDataType(builder, dataType);
+  AttackCommand.addData(builder, dataOffset);
   return AttackCommand.endAttackCommand(builder);
 }
 }

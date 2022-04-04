@@ -3,7 +3,7 @@ include "util.fbs";
 namespace WrathOfToldir.Npcs;
 
 table Npc {
-    key: int32;
+    key: uint32;
     texture: string;
     pos: Vec2;
     char_layer: string;

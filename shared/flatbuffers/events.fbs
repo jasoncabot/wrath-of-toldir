@@ -1,29 +1,30 @@
 include "util.fbs";
 include "maps.fbs";
 include "npcs.fbs";
+include "attacks.fbs";
 
 namespace WrathOfToldir.Events;
 
 table MoveEvent {
-    key: int32;
+    key: uint32;
     pos: Vec2;
     char_layer: string;
 }
 
 table JoinEvent {
-    key: int32;
+    key: uint32;
     pos: Vec2;
     name: string;
     char_layer: string;
 }
 
 table LeaveEvent {
-    key: int32;
+    key: uint32;
 }
 
 table AttackEvent {
-    key: int32;
-    facing: int8;
+    key: uint32;
+    data: WrathOfToldir.Attacks.AttackData;
 }
 
 table MapJoinedEvent {

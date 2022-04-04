@@ -65,6 +65,9 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
 
   playWalkAnimation(direction: Direction) {
     this.walkingState = "walk";
+    this.anims.stop();
+    this.setFrame(this.getStopFrame(direction));
+
     const anim = this.spriteTexture + "_walk_" + normalisedFacingDirection(direction);
     return this.play(anim);
   }
@@ -81,6 +84,10 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   playAttackAnimation(direction: Direction) {
     const oldState = this.walkingState;
     this.walkingState = "attack";
+
+    this.anims.stop();
+    this.setFrame(this.getStopFrame(direction));
+
     this.weaponSprite?.setVisible(true)
       .setDepth(this.depth + 1)
       .setPosition(this.getCenter().x, this.getCenter().y)
@@ -184,13 +191,14 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   }
 
   applyMovement(gridEngine: GridEngine, cursors: Phaser.Types.Input.Keyboard.CursorKeys, pointer: Phaser.Input.Pointer): void {
+
     const moveInDirection = (direction: Direction) => {
       if (cursors.shift.isDown) {
         gridEngine.turnTowards(this.identifier, direction);
-        this.setFrame(this.getStopFrame(direction));
-        this.playStandAnimation(direction);
+        if (this.walkingState !== "attack") this.playStandAnimation(direction);
       } else {
         gridEngine.move(this.identifier, direction);
+        if (this.walkingState !== "walk") this.playWalkAnimation(direction);
       }
     }
 

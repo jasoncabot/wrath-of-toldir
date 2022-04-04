@@ -1,6 +1,6 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
-import { JoinEvent, LeaveEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
+import { AttackData, JoinEvent, LeaveEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Action, AttackCommand, JoinCommand, LeaveCommand, MoveCommand } from "@/models/commands";
 import { AttackEvent } from "@/models/wrath-of-toldir/events/attack-event";
@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getEntityPosition, setEntityPosition } from "@/game/components/positions";
 import { TileCollision } from "@/models/wrath-of-toldir/maps/tile-collision";
 import { MapChangedEvent } from "@/models/wrath-of-toldir/events/map-changed-event";
+import { MagicAttack, NormalAttack } from "@/models/attacks";
 
 export type MapAction = 'store-key' | 'websocket';
 
@@ -146,6 +147,11 @@ export class Map implements DurableObject {
         this.commandQueue.forEach(({ playerId, command }) => {
             console.log(`[id:${this.mapData?.id}] [tick:${this.tickCount}] [${playerId}:${command.seq()}] ${Action[command.actionType()]}`);
 
+            if (!this.connections[playerId]) {
+                console.log(`Player with id ${playerId} has no socket, ignoring`);
+                return;
+            }
+
             let player = this.connections[playerId].player;
             if (!player && command.actionType() !== Action.JoinCommand) {
                 console.log(`Player with id ${playerId} does not exist players.length = ${players.length}`);
@@ -270,7 +276,7 @@ export class Map implements DurableObject {
                 }
                 case Action.AttackCommand: {
                     // read client action
-                    const attack: AttackEvent = command.action(new AttackCommand());
+                    const attack: AttackCommand = command.action(new AttackCommand());
 
                     // update game state
 
@@ -278,9 +284,25 @@ export class Map implements DurableObject {
                     findAttackWitnesses(playerId, players, otherPlayerId => {
                         const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
 
+                        let dataOffset = 0;
+                        switch (attack.dataType()) {
+                            case AttackData.NormalAttack:
+                                const normal = attack.data(new NormalAttack()) as NormalAttack;
+                                dataOffset = NormalAttack.createNormalAttack(builder, normal.facing());
+                                break;
+                            case AttackData.MagicAttack:
+                                const magic = attack.data(new MagicAttack()) as MagicAttack;
+                                const targetPosOffset = Vec2.createVec2(builder, magic.targetPos()!.x(), magic.targetPos()!.y());
+                                MagicAttack.startMagicAttack(builder);
+                                MagicAttack.addTargetKey(builder, magic.targetKey());
+                                MagicAttack.addTargetPos(builder, targetPosOffset);
+                                dataOffset = MagicAttack.endMagicAttack(builder);
+                                break;
+                        }
                         AttackEvent.startAttackEvent(builder);
                         AttackEvent.addKey(builder, player!.key);
-                        AttackEvent.addFacing(builder, attack.facing());
+                        AttackEvent.addDataType(builder, attack.dataType());
+                        AttackEvent.addData(builder, dataOffset);
                         eventOffsets.push(AttackEvent.endAttackEvent(builder));
                         eventTypeOffsets.push(Update.AttackEvent);
                     });

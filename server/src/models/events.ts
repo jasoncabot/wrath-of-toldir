@@ -1,3 +1,4 @@
+export { AttackData, unionToAttackData, unionListToAttackData } from './wrath-of-toldir/attacks/attack-data';
 export { AttackEvent } from './wrath-of-toldir/events/attack-event';
 export { JoinEvent } from './wrath-of-toldir/events/join-event';
 export { LeaveEvent } from './wrath-of-toldir/events/leave-event';

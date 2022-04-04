@@ -1,3 +1,4 @@
+export { AttackData, unionToAttackData, unionListToAttackData } from './wrath-of-toldir/attacks/attack-data';
 export { Action, unionToAction, unionListToAction } from './wrath-of-toldir/commands/action';
 export { AttackCommand } from './wrath-of-toldir/commands/attack-command';
 export { JoinCommand } from './wrath-of-toldir/commands/join-command';

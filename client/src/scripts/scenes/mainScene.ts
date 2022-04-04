@@ -3,7 +3,7 @@ import { DebugText, PlayerCharacter } from '../objects/'
 
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
-import { AttackEvent, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
+import { AttackData, AttackEvent, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
 import { MoveCommand, JoinCommand, Action, Vec2 } from '../../models/commands';
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
@@ -15,6 +15,7 @@ import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import Monster, { MonsterTexture } from '../objects/monster';
 import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed-event';
+import { MagicAttack, NormalAttack } from '../../models/attacks';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -74,7 +75,15 @@ export default class MainScene extends Phaser.Scene {
   }
 
   async create() {
-    this.cursors = this.input.keyboard.createCursorKeys();
+    this.cursors = this.input.keyboard.addKeys({
+      up: Phaser.Input.Keyboard.KeyCodes.W,
+      down: Phaser.Input.Keyboard.KeyCodes.S,
+      left: Phaser.Input.Keyboard.KeyCodes.A,
+      right: Phaser.Input.Keyboard.KeyCodes.D,
+      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
+      shift: Phaser.Input.Keyboard.KeyCodes.SHIFT
+    }) as Phaser.Types.Input.Keyboard.CursorKeys;
+
     this.interfaceCamera = this.cameras.add();
 
     this.debugText = new DebugText(this);
@@ -82,7 +91,7 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.ignore([this.debugText, hud]);
 
     this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
-      if (!this.chatOverlay && event.keyCode == Phaser.Input.Keyboard.KeyCodes.FORWARD_SLASH) {
+      if (!this.chatOverlay && event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
         this.showInputDialog();
       }
     });
@@ -91,14 +100,13 @@ export default class MainScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.currentState !== MapSceneState.READY) return;
+
     this.debugText.update();
+    this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
 
-    if (this.currentState === MapSceneState.READY) {
-      this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
-
-      if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
-        this.applyDefaultAction();
-      }
+    if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
+      this.applyDefaultAction();
     }
   }
 
@@ -191,6 +199,9 @@ export default class MainScene extends Phaser.Scene {
   submitAttack() {
     const facing = this.gridEngine.getFacingDirection('me');
 
+    // TODO: attack with magic
+    // if (this.selectedAttackType == AttackData.MAGIC) ...
+
     if (!this.player.weaponSprite) {
       this.player.weaponSprite = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me');
       this.interfaceCamera.ignore(this.player.weaponSprite);
@@ -198,7 +209,9 @@ export default class MainScene extends Phaser.Scene {
     this.player.playAttackAnimation(facing);
 
     let builder = new Builder(1024);
-    const attack = AttackCommand.createAttackCommand(builder, Directions.indexOf(facing));
+    const attack = AttackCommand.createAttackCommand(builder,
+      AttackData.NormalAttack,
+      NormalAttack.createNormalAttack(builder, Directions.indexOf(facing)));
     Command.startCommand(builder);
     Command.addSeq(builder, ++this.commandSequencer);
     Command.addActionType(builder, Action.AttackCommand);
@@ -260,15 +273,24 @@ export default class MainScene extends Phaser.Scene {
           const attack: AttackEvent = update.events(i, new AttackEvent());
 
           const key = attack.key().toString();
-          const direction = Directions[attack.facing()];
-          const otherPlayer = this.gridEngine.getSprite(key) as PlayerCharacter;
-          this.gridEngine.turnTowards(key, direction);
+          switch (attack.dataType()) {
+            case AttackData.NormalAttack:
+              const normal: NormalAttack = attack.data(new NormalAttack());
+              const normalDirection = Directions[normal.facing()];
+              const otherPlayer = this.gridEngine.getSprite(key) as PlayerCharacter;
+              this.gridEngine.turnTowards(key, normalDirection);
 
-          if (!otherPlayer.weaponSprite) {
-            otherPlayer.weaponSprite = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
-            this.interfaceCamera.ignore(otherPlayer.weaponSprite);
+              if (!otherPlayer.weaponSprite) {
+                otherPlayer.weaponSprite = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
+                this.interfaceCamera.ignore(otherPlayer.weaponSprite);
+              }
+              otherPlayer.playAttackAnimation(normalDirection);
+              break;
+            case AttackData.MagicAttack:
+              const magic: MagicAttack = attack.data(new MagicAttack());
+              console.log(`Attacking target with key ${magic.targetKey()} at (${magic.targetPos()!.x()},${magic.targetPos()!.y()}) with magic`);
+              break;
           }
-          otherPlayer.playAttackAnimation(direction);
 
           break;
         }
