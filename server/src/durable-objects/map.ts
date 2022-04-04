@@ -324,13 +324,13 @@ export class Map implements DurableObject {
                 const oldPos = { ...pos };
                 const x = Math.random();
                 if (x < 0.25) {
-                    pos.x -= 1;
+                    pos.x = Math.max(0, pos.x - 1);
                 } else if (x < 0.50) {
-                    pos.x += 1;
+                    pos.x = Math.min(this.mapData!.width, pos.x + 1);
                 } else if (x < 0.75) {
-                    pos.y -= 1;
+                    pos.y = Math.max(0, pos.y - 1);
                 } else {
-                    pos.y += 1;
+                    pos.y = Math.min(this.mapData!.height, pos.y + 1);
                 }
 
                 // inform other playres
