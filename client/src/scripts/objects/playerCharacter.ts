@@ -194,11 +194,10 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
 
     const moveInDirection = (direction: Direction) => {
       if (cursors.shift.isDown) {
-        gridEngine.turnTowards(this.identifier, direction);
-        if (this.walkingState !== "attack") this.playStandAnimation(direction);
+        gridEngine.stopMovement(this.identifier);
+        gridEngine.turnTowards(this.identifier, direction);        
       } else {
         gridEngine.move(this.identifier, direction);
-        if (this.walkingState !== "walk") this.playWalkAnimation(direction);
       }
     }
 

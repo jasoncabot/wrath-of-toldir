@@ -6,14 +6,16 @@ import { Action, AttackCommand, JoinCommand, LeaveCommand, MoveCommand } from "@
 import { AttackEvent } from "@/models/wrath-of-toldir/events/attack-event";
 import { MapLayer, TileSet } from "@/models/maps";
 import { Npc as NPCBuilder } from "@/models/wrath-of-toldir/npcs/npc";
-import { NPC, Player, PlayerId, ReceivedCommand, TiledJSON } from "@/game/game";
-import { findAttackWitnesses, findJoinWitnesses, findMovementWitnesses } from "@/game/witness";
+import { EntityId, NPC, Player, PlayerId, ReceivedCommand, TiledJSON } from "@/game/game";
 import { loadMapData, validMaps } from "@/data/maps";
 import { v4 as uuidv4 } from 'uuid';
-import { getEntityPosition, setEntityPosition } from "@/game/components/positions";
 import { TileCollision } from "@/models/wrath-of-toldir/maps/tile-collision";
 import { MapChangedEvent } from "@/models/wrath-of-toldir/events/map-changed-event";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
+import { PositionKeeper } from "@/game/components/position-keeper";
+import { DamagedEvent } from "@/models/wrath-of-toldir/events/damaged-event";
+import { EventBuilder } from "@/game/components/event-builder";
+import { AttackResult } from "./combat";
 
 export type MapAction = 'store-key' | 'websocket';
 
@@ -31,7 +33,9 @@ export class Map implements DurableObject {
     commandQueue: ReceivedCommand[];
     mapData: TiledJSON | undefined;
     tickCount: number = 0;
-    npcs: Record<string, NPC>;
+    npcs: Record<EntityId, NPC>;
+    positionKeeper: PositionKeeper;
+    eventBuilder: EventBuilder;
 
     constructor(private readonly state: DurableObjectState, private readonly env: Bindings) {
         this.state = state;
@@ -42,6 +46,8 @@ export class Map implements DurableObject {
         this.intervalHandle = 0;
         this.mapData = undefined;
         this.npcs = {};
+        this.positionKeeper = new PositionKeeper(this.state.storage);
+        this.eventBuilder = new EventBuilder();
     }
 
     initialiseMap(mapId: string) {
@@ -53,10 +59,9 @@ export class Map implements DurableObject {
             const npcId = uuidv4();
             this.npcs[npcId] = {
                 key: Math.floor(Math.random() * 2147483647),
-                type: "slime1",
-                hp: 100
+                type: "slime1"
             };
-            setEntityPosition(npcId, {
+            this.positionKeeper.setEntityPosition(npcId, {
                 x: Math.floor(Math.random() * this.mapData.width),
                 y: Math.floor(Math.random() * this.mapData.height),
                 z: 'charLevel1'
@@ -123,28 +128,12 @@ export class Map implements DurableObject {
         });
     }
 
-    onGameTick() {
+    async onGameTick() {
         const start = new Date().getTime();
         this.tickCount++;
 
-        type Effects = { builder: Builder, eventOffsets: number[], eventTypeOffsets: number[] };
-        const eventsAffectingPlayer: Record<PlayerId, Effects> = {};
-
-        const findEventStore = (playerId: PlayerId) => {
-            let data = eventsAffectingPlayer[playerId];
-            if (!data) {
-                data = {
-                    builder: new Builder(1024),
-                    eventOffsets: [],
-                    eventTypeOffsets: []
-                };
-                eventsAffectingPlayer[playerId] = data;
-            }
-            return data;
-        }
-
         const players: PlayerId[] = Object.keys(this.connections);
-        this.commandQueue.forEach(({ playerId, command }) => {
+        for (const { playerId, command } of this.commandQueue) {
             console.log(`[id:${this.mapData?.id}] [tick:${this.tickCount}] [${playerId}:${command.seq()}] ${Action[command.actionType()]}`);
 
             if (!this.connections[playerId]) {
@@ -164,8 +153,8 @@ export class Map implements DurableObject {
                     const move: MoveCommand = command.action(new MoveCommand());
 
                     // update game state
-                    const pos = getEntityPosition(playerId);
-                    const oldPos = { ...pos };
+                    const oldPos = this.positionKeeper.getEntityPosition(playerId);
+                    const pos = { ...oldPos, x: move.pos()!.x(), y: move.pos()!.y() };
 
                     // update game state
 
@@ -173,7 +162,7 @@ export class Map implements DurableObject {
                     if (move.pos()!.x() == 80 && move.pos()!.y() == 28) {
                         // zone transition to testroom1
                         // update game state
-                        const playerWhoLeft = findEventStore(playerId);
+                        const playerWhoLeft = this.eventBuilder.tickEventsForPlayer(playerId);
 
                         const newMapIdOffset = playerWhoLeft.builder.createString("testroom1");
                         const mapChangedEventOffset = MapChangedEvent.createMapChangedEvent(playerWhoLeft.builder, newMapIdOffset);
@@ -184,12 +173,11 @@ export class Map implements DurableObject {
                         break;
                     }
 
-                    pos.x = move.pos()!.x();
-                    pos.y = move.pos()!.y();
+                    this.positionKeeper.setEntityPosition(playerId, { x: move.pos()!.x(), y: move.pos()!.y(), z: pos.z });
 
                     // inform other players
-                    findMovementWitnesses(playerId, players, oldPos, pos, (id: PlayerId) => {
-                        const { builder, eventOffsets, eventTypeOffsets } = findEventStore(id);
+                    this.positionKeeper.findMovementWitnesses(playerId, players, oldPos, pos, (id: PlayerId) => {
+                        const { builder, eventOffsets, eventTypeOffsets } = this.eventBuilder.tickEventsForPlayer(id);
 
                         const charLayerOffset = builder.createString(pos.z);
 
@@ -212,23 +200,23 @@ export class Map implements DurableObject {
                         name: join.name()!
                     };
                     this.connections[playerId].player = player;
-                    setEntityPosition(playerId, {
+                    this.positionKeeper.setEntityPosition(playerId, {
                         x: Math.floor(Math.random() * this.mapData!.width),
                         y: Math.floor(Math.random() * this.mapData!.height),
                         z: 'charLevel1'
                     });
 
                     // inform other players
-                    const joined = findEventStore(playerId);
+                    const joined = this.eventBuilder.tickEventsForPlayer(playerId);
                     this.addCurrentMapState(joined, playerId);
-                    const playerPos = getEntityPosition(playerId);
-                    findJoinWitnesses(playerId, players, otherPlayerId => {
-                        const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
+                    const playerPos = this.positionKeeper.getEntityPosition(playerId);
+                    this.positionKeeper.findJoinWitnesses(playerId, players, otherPlayerId => {
+                        const { builder, eventOffsets, eventTypeOffsets } = this.eventBuilder.tickEventsForPlayer(otherPlayerId);
 
                         // tell the player who joined about other players who are already here
                         const otherPlayer = this.connections[otherPlayerId].player;
                         if (otherPlayer) {
-                            const otherPlayerPos = getEntityPosition(otherPlayerId);
+                            const otherPlayerPos = this.positionKeeper.getEntityPosition(otherPlayerId);
                             const otherPlayerName = joined.builder.createString(otherPlayer.name);
                             const charLayerOffset = builder.createString(otherPlayerPos.z);
                             JoinEvent.startJoinEvent(joined.builder);
@@ -258,6 +246,7 @@ export class Map implements DurableObject {
 
                     // update game state
                     delete this.connections[playerId];
+                    this.positionKeeper.clearEntityPosition(playerId);
 
                     if (Object.keys(this.connections).length === 0) {
                         // no one is connected, no point to carry on ticking
@@ -267,7 +256,7 @@ export class Map implements DurableObject {
                         // inform other players
                         players.forEach(otherPlayerId => {
                             if (otherPlayerId == playerId) return;
-                            const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
+                            const { builder, eventOffsets, eventTypeOffsets } = this.eventBuilder.tickEventsForPlayer(otherPlayerId);
                             eventOffsets.push(LeaveEvent.createLeaveEvent(builder, player!.key));
                             eventTypeOffsets.push(Update.LeaveEvent);
                         });
@@ -279,10 +268,33 @@ export class Map implements DurableObject {
                     const attack: AttackCommand = command.action(new AttackCommand());
 
                     // update game state
+                    // const position = this.positionKeeper.getEntityPosition(playerId);
+                    const atk = attack.data(new NormalAttack()) as NormalAttack;
+                    const facingPosition = this.positionKeeper.getFacingPosition(playerId, atk.facing());
+                    const targetEntityIds = this.positionKeeper.getEntitiesAtPosition(facingPosition, true);
+                    let damages: { key: number, damage: number }[] = [];
+                    if (targetEntityIds.size > 0) {
+                        const playerIdCombat = this.env.COMBAT.idFromName(playerId);
+                        const stub = this.env.COMBAT.get(playerIdCombat);
+                        const result = await stub.fetch(`http://combat/?action=attack`, {
+                            method: 'POST',
+                            body: JSON.stringify({ targets: Array.from(targetEntityIds.values()) })
+                        });
+                        (await result.json() as AttackResult[]).forEach(({ entityId, damage }) => {
+                            const npc = this.npcs[entityId];
+                            if (npc) damages.push({ key: npc.key, damage });
+                        });
+                        const playerWhoAttacked = this.eventBuilder.tickEventsForPlayer(playerId);
+                        damages.forEach(({ key, damage }) => {
+                            const damagedEventOffset = DamagedEvent.createDamagedEvent(playerWhoAttacked.builder, key, damage);
+                            playerWhoAttacked.eventOffsets.push(damagedEventOffset);
+                            playerWhoAttacked.eventTypeOffsets.push(Update.DamagedEvent);
+                        });
+                    }
 
                     // inform other players
-                    findAttackWitnesses(playerId, players, otherPlayerId => {
-                        const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
+                    this.positionKeeper.findAttackWitnesses(playerId, players, (otherPlayerId) => {
+                        const { builder, eventOffsets, eventTypeOffsets } = this.eventBuilder.tickEventsForPlayer(otherPlayerId);
 
                         let dataOffset = 0;
                         switch (attack.dataType()) {
@@ -305,11 +317,16 @@ export class Map implements DurableObject {
                         AttackEvent.addData(builder, dataOffset);
                         eventOffsets.push(AttackEvent.endAttackEvent(builder));
                         eventTypeOffsets.push(Update.AttackEvent);
+
+                        damages.forEach(({ key, damage }) => {
+                            eventOffsets.push(DamagedEvent.createDamagedEvent(builder, key, damage));
+                            eventTypeOffsets.push(Update.DamagedEvent);
+                        });
                     });
                     break;
                 }
             }
-        });
+        }
         this.commandQueue = [];
 
         // TODO: rather going through all - keep a wake up list
@@ -317,11 +334,12 @@ export class Map implements DurableObject {
         // this.tickCount instead of randomly choosing each turn
         Object.keys(this.npcs).forEach(npcId => {
             const { key } = this.npcs[npcId];
-            const pos = getEntityPosition(npcId);
+            const oldPos = this.positionKeeper.getEntityPosition(npcId);
             // update game state
-            const willMove = Math.random() < 0.50;
+            const willMove = Math.random() < 0.25;
             if (willMove) {
-                const oldPos = { ...pos };
+
+                let pos = { ...oldPos };
                 const x = Math.random();
                 if (x < 0.25) {
                     pos.x = Math.max(0, pos.x - 1);
@@ -332,10 +350,12 @@ export class Map implements DurableObject {
                 } else {
                     pos.y = Math.min(this.mapData!.height, pos.y + 1);
                 }
+                this.positionKeeper.setEntityPosition(npcId, pos);
+
 
                 // inform other playres
-                findMovementWitnesses(npcId, players, oldPos, pos, otherPlayerId => {
-                    const { builder, eventOffsets, eventTypeOffsets } = findEventStore(otherPlayerId);
+                this.positionKeeper.findMovementWitnesses(npcId, players, oldPos, pos, otherPlayerId => {
+                    const { builder, eventOffsets, eventTypeOffsets } = this.eventBuilder.tickEventsForPlayer(otherPlayerId);
 
                     const charLayerOffset = builder.createString(pos.z);
 
@@ -357,7 +377,7 @@ export class Map implements DurableObject {
                     return;
                 }
 
-                const events = eventsAffectingPlayer[playerId];
+                const events = this.eventBuilder.popEventsForPlayer(playerId);
                 if (events) {
                     const { builder, eventOffsets, eventTypeOffsets } = events;
                     const eventVector = EventLog.createEventsVector(builder, eventOffsets);
@@ -368,6 +388,7 @@ export class Map implements DurableObject {
                     const update = EventLog.endEventLog(builder);
                     builder.finish(update);
 
+                    console.log("Flushing events for " + playerId);
                     player.socket.send(builder.asUint8Array());
                 }
             } catch (err) {
@@ -375,8 +396,9 @@ export class Map implements DurableObject {
             }
         };
 
-        if ((new Date().getTime() - start) > 300) {
-            console.warn(`[tick:${this.tickCount}] queue-length:${this.commandQueue.length} took too much time to process`);
+        const elapsed = (new Date().getTime() - start);
+        if (elapsed > TICK_RATE * 0.8) {
+            console.warn(`[tick:${this.tickCount}] queue-length:${this.commandQueue.length} took too much time (${elapsed}ms) to process`);
         }
     }
 
@@ -416,7 +438,7 @@ export class Map implements DurableObject {
 
         const npcOffsets = Object.keys(this.npcs).map(npcId => {
             const npc = this.npcs[npcId];
-            const pos = getEntityPosition(npcId);
+            const pos = this.positionKeeper.getEntityPosition(npcId);
             const textureOffset = builder.createString(npc.type);
             const charLayerOffset = builder.createString(pos.z);
             NPCBuilder.startNpc(builder);
@@ -424,12 +446,11 @@ export class Map implements DurableObject {
             NPCBuilder.addTexture(builder, textureOffset);
             NPCBuilder.addCharLayer(builder, charLayerOffset);
             NPCBuilder.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y))
-            NPCBuilder.addHp(builder, npc.hp);
             return NPCBuilder.endNpc(builder);
         })
         const npcsVector = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
 
-        const playerPosition = getEntityPosition(playerId);
+        const playerPosition = this.positionKeeper.getEntityPosition(playerId);
         const charLayerOffset = builder.createString(playerPosition.z);
         MapJoinedEvent.startMapJoinedEvent(builder);
         MapJoinedEvent.addCharLayer(builder, charLayerOffset);

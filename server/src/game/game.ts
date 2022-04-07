@@ -41,5 +41,4 @@ export interface TiledJSON {
 export interface NPC {
     key: number
     type: string
-    hp: number
 }

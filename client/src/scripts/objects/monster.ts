@@ -21,10 +21,9 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
     identifier: string;
     monsterTexture: MonsterTexture;
     gridEngineCharacterData: CharacterData;
-    hp: number;
     walkingState: "walk" | "stand" | "attack";
 
-    constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: MonsterTexture, identifier: string, hp: number) {
+    constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: MonsterTexture, identifier: string) {
         super(scene, 0, 0, texture, 0);
         this.identifier = identifier;
         this.monsterTexture = texture;
@@ -34,12 +33,11 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
             speed: 2,
             startPosition: { x, y },
             collides: {
-                collisionGroups: [],
+                collisionGroups: ["monster"],
             },
             facingDirection: Direction.DOWN,
             charLayer: z
         }
-        this.hp = hp;
         this.walkingState = "stand";
 
         scene.add.existing(this);

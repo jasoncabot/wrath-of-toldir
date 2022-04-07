@@ -12,6 +12,7 @@ compatibility_flags = []
 [durable_objects]
 bindings = [
   { name = "MAP", class_name = "Map" },
+  { name = "COMBAT", class_name = "Combat" }
 ]
 
 [build]
@@ -27,7 +28,7 @@ durable_objects_persist = true
 
 [[migrations]]
 tag = "v1"
-new_classes = ["Map"]
+new_classes = ["Map", "Combat"]
 
 [vars]
 FRONTEND_URI="http://192.168.1.40:8080"
@@ -38,9 +39,10 @@ vars = { FRONTEND_URI = "https://wot.jasoncabot.com" }
 
 [env.production.durable_objects]
 bindings = [
-  { name = "MAP", class_name = "Map" }
+  { name = "MAP", class_name = "Map" },
+  { name = "COMBAT", class_name = "Combat" }
 ]
 
 [[env.production.migrations]]
 tag = "v1"
-new_classes = ["Map"]
+new_classes = ["Map", "Combat"]

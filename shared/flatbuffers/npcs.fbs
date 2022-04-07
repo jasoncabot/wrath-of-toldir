@@ -7,5 +7,4 @@ table Npc {
     texture: string;
     pos: Vec2;
     char_layer: string;
-    hp: uint16;
 }

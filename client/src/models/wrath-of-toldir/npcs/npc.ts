@@ -47,13 +47,8 @@ charLayer(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-hp():number {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
-}
-
 static startNpc(builder:flatbuffers.Builder) {
-  builder.startObject(5);
+  builder.startObject(4);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -70,10 +65,6 @@ static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
 
 static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
   builder.addFieldOffset(3, charLayerOffset, 0);
-}
-
-static addHp(builder:flatbuffers.Builder, hp:number) {
-  builder.addFieldInt16(4, hp, 0);
 }
 
 static endNpc(builder:flatbuffers.Builder):flatbuffers.Offset {

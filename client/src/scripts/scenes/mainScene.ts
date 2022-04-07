@@ -16,6 +16,7 @@ import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import Monster, { MonsterTexture } from '../objects/monster';
 import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed-event';
 import { MagicAttack, NormalAttack } from '../../models/attacks';
+import { DamagedEvent } from '../../models/wrath-of-toldir/events/damaged-event';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -304,6 +305,40 @@ export default class MainScene extends Phaser.Scene {
           this.transitionToInitial(event.id()!);
           break;
         }
+        case Update.DamagedEvent: {
+          const event: DamagedEvent = update.events(i, new DamagedEvent());
+          const enemy = this.gridEngine.getSprite(event.key().toString());
+          const damage = this.add.text(enemy.getCenter().x, enemy.y, event.amount().toString(), {
+            color: '#ffffff',
+            fontSize: '16px',
+            fontFamily: "'Press Start 2P'"
+          })
+            .setDepth(Math.max(this.player.depth, enemy.depth) + 1)
+            .setOrigin(0.5, 1);
+          this.interfaceCamera.ignore(damage);
+          this.tweens.add({
+            targets: damage,
+            y: damage.y - 10,
+            ease: "Sine.easeOut",
+            duration: 250,
+            yoyo: false,
+            callbackScope: this,
+            onComplete: () => {
+              this.tweens.add({
+                targets: damage,
+                alpha: 0,
+                ease: "Sine.easeOut",
+                duration: 500,
+                yoyo: false,
+                callbackScope: this,
+                onComplete: function () {
+                  damage.destroy();
+                }
+              });
+            }
+          });
+          break;
+        }
       }
     }
   }
@@ -421,7 +456,7 @@ export default class MainScene extends Phaser.Scene {
 
     for (let i = 0; i < event.npcsLength(); i++) {
       const npc = event.npcs(i)!;
-      const sprite = new Monster(this, npc.pos()!.x(), npc.pos()!.y(), npc.charLayer()!, npc.texture()! as MonsterTexture, npc.key().toString(), npc.hp());
+      const sprite = new Monster(this, npc.pos()!.x(), npc.pos()!.y(), npc.charLayer()!, npc.texture()! as MonsterTexture, npc.key().toString());
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
       this.interfaceCamera.ignore(sprite);
