@@ -30,6 +30,10 @@ durable_objects_persist = true
 tag = "v1"
 new_classes = ["Map", "Combat"]
 
+[[migrations]]
+tag = "v2"
+new_classes = ["Combat"]
+
 [vars]
 FRONTEND_URI="http://192.168.1.40:8080"
 
@@ -45,4 +49,8 @@ bindings = [
 
 [[env.production.migrations]]
 tag = "v1"
-new_classes = ["Map", "Combat"]
+new_classes = ["Map"]
+
+[[env.production.migrations]]
+tag = "v2"
+new_classes = ["Combat"]
