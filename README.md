@@ -4,14 +4,17 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 
 ## TODO List
 
-- [ ] Spawning of players and monsters should not be on an invalid tile
+- [ ] Simple mobile controls using a virtual joystick
+- [ ] Chat bubbles
+- [ ] HUD - switch between physical and magical attack (numbers 1, 2, 3)
+- [ ] Magic Attacks
 - [ ] Joining a map should only tell you about stuff you can see (so not all people / npcs and their positions)
 - [ ] Attacks should kill NPC
-- [ ] NPCs should have some kind of basic AI
 - [ ] Item system should hold inventory
 - [ ] Loot items
-- [ ] HUD
 - [ ] Water should be animated
+- [X] NPCs should have some kind of basic AI - I mean they walk randomly
+- [X] Spawning of players and monsters should not be on an invalid tile
 - [X] Transfer player between maps (zones)
 - [X] Combat system should hold HP, ATK, DEF e.t.c
 - [X] Add NPC characters that just amble about
