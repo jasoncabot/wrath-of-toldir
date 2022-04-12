@@ -1,0 +1,34 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "start",
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "webpack",
+				"severity": "error",
+				"fileLocation": "absolute",
+				"pattern": [
+					{
+						"regexp": "ERROR in [^ ]* (.*):(.*):(.*)",
+						"file": 1,
+						"line": 2,
+						"column": 3
+					},
+					{
+						"regexp": ".*",
+						"message": 0
+					}
+				],
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "webpack building...",
+					"endsPattern": "webpack compiled successfully"
+				}
+			},
+			"label": "yarn start",
+			"detail": "webpack serve --config webpack/webpack.dev.js"
+		}
+	]
+}
