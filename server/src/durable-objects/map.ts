@@ -28,7 +28,7 @@ export class Map implements DurableObject {
     mapData: TiledJSON | undefined;
     tickCount: number = 0;
     npcs: Record<EntityId, NPC>;
-    positionKeeper: PositionKeeper;
+    positionKeeper!: PositionKeeper;
     eventBuilder: EventBuilder;
     ai!: ArtificialIntelligence;
 
@@ -40,13 +40,13 @@ export class Map implements DurableObject {
         this.intervalHandle = 0;
         this.mapData = undefined;
         this.npcs = {};
-        this.positionKeeper = new PositionKeeper(this.state.storage);
         this.eventBuilder = new EventBuilder();
     }
 
     initialiseMap(mapId: string) {
         this.mapData = loadMapData(mapId);
         // TODO: slice and dice these dependencies a bit better, perhaps put them in a context
+        this.positionKeeper = new PositionKeeper(this.state.storage, this.mapData);
         this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.env.COMBAT);
         this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs);
 
@@ -56,13 +56,9 @@ export class Map implements DurableObject {
             const npcId = uuidv4();
             this.npcs[npcId] = {
                 key: Math.floor(Math.random() * 2147483647),
-                type: "slime1"
+                type: "slime1",
             };
-            this.positionKeeper.setEntityPosition(npcId, {
-                x: Math.floor(Math.random() * this.mapData.width),
-                y: Math.floor(Math.random() * this.mapData.height),
-                z: 'charLevel1'
-            });
+            this.positionKeeper.spawnEntityAtFreePosition(npcId);
         }
     }
 

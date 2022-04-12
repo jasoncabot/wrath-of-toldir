@@ -1,4 +1,4 @@
-import { EntityId, PlayerId } from "../game"
+import { EntityId, PlayerId, TiledJSON } from "../game"
 
 export type Elevation = string
 type PositionKey = string
@@ -36,12 +36,27 @@ export class PositionKeeper {
     positions: Record<EntityId, Position>
     positionIndex: Record<PositionKey, EntityIndex>
     storage: DurableObjectStorage
+    map: TiledJSON
+    blockedTileIdentifiers: Set<number>
 
-    constructor(storage: DurableObjectStorage) {
+    constructor(storage: DurableObjectStorage, map: TiledJSON) {
         this.positions = {};
         this.positionIndex = {};
 
         this.storage = storage;
+        this.map = map;
+
+        // pre-populate the set of map tile identifiers that we can't walk on
+        this.blockedTileIdentifiers = new Set<number>();
+        for (let tileset of this.map.tilesets) {
+            for (let colliion of tileset.collisions) {
+                const allDirections = 0b11111111; // this represents all directions are blocked, so we can't spawn here
+                if (colliion.directions === allDirections) {
+                    this.blockedTileIdentifiers.add(colliion.index);
+                }
+            }
+        }
+
     }
 
     toKey(x: number, y: number) {
@@ -89,6 +104,22 @@ export class PositionKeeper {
         entities.add(id);
     }
 
+    spawnEntityAtFreePosition(entityId: EntityId) {
+        let spawnPosition: Position | undefined = undefined;
+        while (!spawnPosition) {
+            spawnPosition = {
+                x: Math.floor(Math.random() * this.map.width),
+                y: Math.floor(Math.random() * this.map.height),
+                z: 'charLevel1'
+            };
+            if (this.isBlocked(spawnPosition)) {
+                spawnPosition = undefined;
+            }
+        }
+
+        this.setEntityPosition(entityId, spawnPosition);
+    }
+
     getEntitiesAtPosition(position: Position, ignoringElevation = false) {
         const key = this.toKey(position.x, position.y);
         const allElevations = this.positionIndex[key] || {};
@@ -125,6 +156,17 @@ export class PositionKeeper {
             case Direction.DOWN: return { ...position, y: position.y + 1 };
             case Direction.DOWN_LEFT: return { ...position, x: position.x - 1, y: position.y - 1 };
         }
+    }
+
+    isBlocked(position: Position) {
+        if (this.getEntitiesAtPosition(position, true).size > 0) return true;
+
+        const layer = this.map.layers.find(x => x.charLayer == position.z);
+        if (!layer) return false;
+
+        const tileId = layer!.data[position.x + (position.y * this.map.width)];
+
+        return this.blockedTileIdentifiers.has(tileId);
     }
 
     /**

@@ -89,11 +89,7 @@ export class CommandQueue {
                         name: join.name()!
                     };
                     this.connections[playerId].player = player;
-                    this.positionKeeper.setEntityPosition(playerId, {
-                        x: Math.floor(Math.random() * this.map.width),
-                        y: Math.floor(Math.random() * this.map.height),
-                        z: 'charLevel1'
-                    });
+                    this.positionKeeper.spawnEntityAtFreePosition(playerId);
 
                     // inform other players
                     this.eventBuilder.pushCurrentMapState(playerId, this.map, this.npcs, this.positionKeeper);
