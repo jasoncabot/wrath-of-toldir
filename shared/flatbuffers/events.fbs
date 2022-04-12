@@ -41,6 +41,8 @@ table MapJoinedEvent {
 
 table MapChangedEvent {
     id: string;
+    pos: Vec2;
+    char_layer: string;
 }
 
 union Update { 

@@ -2,6 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { Vec2 } from '../../wrath-of-toldir/vec2';
+
+
 export class MapChangedEvent {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -27,12 +30,32 @@ id(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+pos(obj?:Vec2):Vec2|null {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? (obj || new Vec2()).__init(this.bb_pos + offset, this.bb!) : null;
+}
+
+charLayer():string|null
+charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+charLayer(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
 static startMapChangedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(3);
 }
 
 static addId(builder:flatbuffers.Builder, idOffset:flatbuffers.Offset) {
   builder.addFieldOffset(0, idOffset, 0);
+}
+
+static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
+  builder.addFieldStruct(1, posOffset, 0);
+}
+
+static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, charLayerOffset, 0);
 }
 
 static endMapChangedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -40,9 +63,4 @@ static endMapChangedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createMapChangedEvent(builder:flatbuffers.Builder, idOffset:flatbuffers.Offset):flatbuffers.Offset {
-  MapChangedEvent.startMapChangedEvent(builder);
-  MapChangedEvent.addId(builder, idOffset);
-  return MapChangedEvent.endMapChangedEvent(builder);
-}
 }

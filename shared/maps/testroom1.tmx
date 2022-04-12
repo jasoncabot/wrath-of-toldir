@@ -53,6 +53,7 @@
  <layer id="3" name="charLevel1" width="10" height="10" opacity="0.41">
   <properties>
    <property name="ge_charLayer" value="charLevel1"/>
+   <property name="transition_fisherswatch" value="4:9=&gt;80:29:charLevel1"/>
   </properties>
   <data encoding="csv">
 1284,1284,1284,1284,1284,1284,1284,1284,1284,1284,

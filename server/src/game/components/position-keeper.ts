@@ -1,4 +1,4 @@
-import { EntityId, PlayerId, TiledJSON } from "../game"
+import { EntityId, MapTransition, PlayerId, TiledJSON } from "../game"
 
 export type Elevation = string
 type PositionKey = string
@@ -56,7 +56,6 @@ export class PositionKeeper {
                 }
             }
         }
-
     }
 
     toKey(x: number, y: number) {
@@ -167,6 +166,11 @@ export class PositionKeeper {
         const tileId = layer!.data[position.x + (position.y * this.map.width)];
 
         return this.blockedTileIdentifiers.has(tileId);
+    }
+
+    getMapTransitionAtPosition(position: Position) {
+        const transition = this.map.layers.find(l => l.key === position.z)?.transitions.find(t => t.x === position.x && t.y === position.y);
+        return transition;
     }
 
     /**

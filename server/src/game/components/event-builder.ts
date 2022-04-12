@@ -147,11 +147,16 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.MapJoinedEvent);
     }
 
-    pushMapChangedEvent(playerId: PlayerId, mapId: string) {
+    pushMapChangedEvent(playerId: PlayerId, mapId: string, position: Position) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         const newMapIdOffset = builder.createString(mapId);
-        const mapChangedEventOffset = MapChangedEvent.createMapChangedEvent(builder, newMapIdOffset);
+        const charLayerOffset = builder.createString(position.z);
+        MapChangedEvent.startMapChangedEvent(builder);
+        MapChangedEvent.addId(builder, newMapIdOffset);
+        MapChangedEvent.addPos(builder, Vec2.createVec2(builder, position.x, position.y));
+        MapChangedEvent.addCharLayer(builder, charLayerOffset);
+        const mapChangedEventOffset = MapChangedEvent.endMapChangedEvent(builder);
 
         eventOffsets.push(mapChangedEventOffset);
         eventTypeOffsets.push(Update.MapChangedEvent);

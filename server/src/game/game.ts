@@ -1,4 +1,5 @@
 import { Command } from "@/models/wrath-of-toldir/commands/command"
+import { Position } from "./components/position-keeper"
 
 export type EntityId = string
 export type PlayerId = EntityId
@@ -13,10 +14,18 @@ export interface ReceivedCommand {
     command: Command
 }
 
+export interface MapTransition {
+    x: number
+    y: number
+    targetId: string
+    target: Position
+}
+
 export interface MapDataLayer {
     key: string
     data: number[]
     charLayer: string | undefined
+    transitions: MapTransition[]
 }
 
 export interface MapTileSetCollision {

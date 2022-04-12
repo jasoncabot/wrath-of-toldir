@@ -3,7 +3,7 @@ import { Connection } from "@/durable-objects/map";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
 import { Action, MoveCommand, JoinCommand, AttackCommand, AttackData } from "@/models/commands";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
-import { EntityId, NPC, PlayerId, ReceivedCommand, TiledJSON } from "../game";
+import { EntityId, MapTransition, NPC, PlayerId, ReceivedCommand, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
 import { Position, PositionKeeper } from "./position-keeper";
 
@@ -61,13 +61,10 @@ export class CommandQueue {
                     const oldPos = this.positionKeeper.getEntityPosition(playerId);
                     const pos = { ...oldPos, x: move.pos()!.x(), y: move.pos()!.y() };
 
-                    // update game state
-
                     // check if this new position should move us to a new zone
-                    if (move.pos()!.x() == 80 && move.pos()!.y() == 28) {
-                        // zone transition to testroom1
-                        // update game state
-                        this.eventBuilder.pushMapChangedEvent(playerId, "testroom1");
+                    const transition: MapTransition | undefined = this.positionKeeper.getMapTransitionAtPosition(pos);
+                    if (transition) {
+                        this.eventBuilder.pushMapChangedEvent(playerId, transition.targetId, transition.target);
                         break; // skip processing a normal move
                     }
 

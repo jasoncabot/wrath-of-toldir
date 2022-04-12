@@ -49,6 +49,11 @@
                  "name":"ge_charLayer",
                  "type":"string",
                  "value":"charLevel1"
+                }, 
+                {
+                 "name":"transition_fisherswatch",
+                 "type":"string",
+                 "value":"4:9=>80:29:charLevel1"
                 }],
          "type":"tilelayer",
          "visible":true,

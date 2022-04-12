@@ -37,6 +37,11 @@
                  "name":"ge_charLayer",
                  "type":"string",
                  "value":"charLevel1"
+                }, 
+                {
+                 "name":"transition_testroom1",
+                 "type":"string",
+                 "value":"80:28=>4:8:charLevel1"
                 }],
          "type":"tilelayer",
          "visible":true,

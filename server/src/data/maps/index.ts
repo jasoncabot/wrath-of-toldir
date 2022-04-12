@@ -1,4 +1,4 @@
-import { MapDataLayer, MapTileSet, MapTileSetCollision, TiledJSON } from '@/game/game';
+import { MapDataLayer, MapTileSet, MapTileSetCollision, MapTransition, TiledJSON } from '@/game/game';
 import fisherswatch from './fisherswatch.json';
 import testroom1 from './testroom1.json';
 
@@ -68,10 +68,33 @@ export const loadMapData = (mapId: string) => {
     return {
         id: mapId,
         layers: map.layers.map((layer: any) => {
+            let charLayer = undefined;
+            let transitions: MapTransition[] = [];
+
+            for (let keyValuePair of (layer.properties || []) as { name: string, value: string }[]) {
+                if (keyValuePair.name === "ge_charLayer") {
+                    charLayer = keyValuePair.value;
+                }
+
+                if (keyValuePair.name.startsWith("transition_")) {
+                    const mapId = keyValuePair.name.split("_")[1];
+                    const parts = keyValuePair.value.split("=>");
+                    const [startX, startY] = parts[0].split(":");
+                    const [targetX, targetY, z] = parts[1].split(":");
+                    transitions.push({
+                        x: parseInt(startX, 10),
+                        y: parseInt(startY, 10),
+                        targetId: mapId,
+                        target: { x: parseInt(targetX, 10), y: parseInt(targetY, 10), z }
+                    })
+                }
+            }
+
             return {
                 key: layer.name,
                 data: layer.data,
-                charLayer: (layer.properties || []).find((x: any) => x.name == "ge_charLayer")?.value
+                charLayer,
+                transitions
             } as MapDataLayer
         }),
         tilesets: parseTileSets(map),
