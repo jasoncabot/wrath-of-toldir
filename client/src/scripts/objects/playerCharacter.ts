@@ -1,7 +1,6 @@
 import { CharacterData, Direction, GridEngine } from "grid-engine";
+import { HeroTexture } from "../../models/wrath-of-toldir/events/hero-texture";
 import Weapon from "./weapon";
-
-export type SpriteTexture = 'hero1'
 
 export interface WalkingAnimatable {
   walkingState: "walk" | "stand" | "attack"
@@ -24,18 +23,31 @@ export const normalisedFacingDirection = (direction: Direction) => {
   }
 }
 
+const asSpriteTexture = (texture: HeroTexture) => {
+  switch (texture) {
+    case HeroTexture.Hero1: return 'hero1';
+    case HeroTexture.Hero2: return 'hero2';
+    case HeroTexture.Hero3: return 'hero3';
+    case HeroTexture.Hero4: return 'hero4';
+    case HeroTexture.Hero5: return 'hero5';
+    case HeroTexture.Hero6: return 'hero6';
+    case HeroTexture.Hero7: return 'hero7';
+    case HeroTexture.Hero8: return 'hero8';
+    case HeroTexture.Hero9: return 'hero9';
+    case HeroTexture.Hero10: return 'hero10';
+  }
+}
+
 export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implements WalkingAnimatable {
   identifier: string;
-  spriteTexture: SpriteTexture;
   gridEngineCharacterData: CharacterData;
   canAttack: boolean
   weaponSprite: Weapon | undefined;
   walkingState: "walk" | "stand" | "attack";
 
-  constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: SpriteTexture, identifier: string) {
-    super(scene, 0, 0, texture, 0);
+  constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: HeroTexture, identifier: string) {
+    super(scene, 0, 0, asSpriteTexture(texture), 0);
     this.identifier = identifier;
-    this.spriteTexture = texture;
     this.gridEngineCharacterData = {
       id: identifier,
       sprite: this,
@@ -68,7 +80,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     this.anims.stop();
     this.setFrame(this.getStopFrame(direction));
 
-    const anim = this.spriteTexture + "_walk_" + normalisedFacingDirection(direction);
+    const anim = this.texture.key + "_walk_" + normalisedFacingDirection(direction);
     return this.play(anim);
   }
 
@@ -77,7 +89,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     this.anims.stop();
     this.setFrame(this.getStopFrame(direction));
 
-    const anim = this.spriteTexture + "_stand_" + normalisedFacingDirection(direction);
+    const anim = this.texture.key + "_stand_" + normalisedFacingDirection(direction);
     return this.play(anim);
   }
 
@@ -92,7 +104,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
       .setDepth(this.depth + 1)
       .setPosition(this.getCenter().x, this.getCenter().y)
       .playAttackAnimation(direction);
-    const anim = this.spriteTexture + "_attack_" + normalisedFacingDirection(direction);
+    const anim = this.texture.key + "_attack_" + normalisedFacingDirection(direction);
     return this.play(anim).on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       this.weaponSprite?.setVisible(false);
       if (oldState == "walk") {
@@ -103,7 +115,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     });
   }
 
-  static preload = (scene: Phaser.Scene, texture: SpriteTexture) => {
+  static preload = (scene: Phaser.Scene, texture: string) => {
     const frameRate = {
       attack: 16,
       stand: 4,
@@ -195,7 +207,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     const moveInDirection = (direction: Direction) => {
       if (cursors.shift.isDown) {
         gridEngine.stopMovement(this.identifier);
-        gridEngine.turnTowards(this.identifier, direction);        
+        gridEngine.turnTowards(this.identifier, direction);
       } else {
         gridEngine.move(this.identifier, direction);
       }

@@ -2,6 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { HeroTexture } from '../../wrath-of-toldir/events/hero-texture';
 import { TileMap } from '../../wrath-of-toldir/maps/tile-map';
 import { Npc } from '../../wrath-of-toldir/npcs/npc';
 import { Vec2 } from '../../wrath-of-toldir/vec2';
@@ -52,8 +53,13 @@ npcsLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
+texture():HeroTexture {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : HeroTexture.Hero1;
+}
+
 static startMapJoinedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 }
 
 static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
@@ -82,6 +88,10 @@ static createNpcsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):
 
 static startNpcsVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
+}
+
+static addTexture(builder:flatbuffers.Builder, texture:HeroTexture) {
+  builder.addFieldInt8(4, texture, HeroTexture.Hero1);
 }
 
 static endMapJoinedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

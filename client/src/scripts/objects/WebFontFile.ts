@@ -25,6 +25,9 @@ export default class WebFontFile extends Phaser.Loader.File {
             active: () => {
                 this.loader.nextFile(this, true)
             },
+            inactive: () => {
+                this.loader.nextFile(this, false)
+            },
             google: {
                 families: this.fontNames
             }

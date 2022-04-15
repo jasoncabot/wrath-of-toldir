@@ -2,6 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { HeroTexture } from '../../wrath-of-toldir/events/hero-texture';
 import { Vec2 } from '../../wrath-of-toldir/vec2';
 
 
@@ -47,8 +48,13 @@ charLayer(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+texture():HeroTexture {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : HeroTexture.Hero1;
+}
+
 static startJoinEvent(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -65,6 +71,10 @@ static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
 
 static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
   builder.addFieldOffset(3, charLayerOffset, 0);
+}
+
+static addTexture(builder:flatbuffers.Builder, texture:HeroTexture) {
+  builder.addFieldInt8(4, texture, HeroTexture.Hero1);
 }
 
 static endJoinEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

@@ -1,8 +1,9 @@
 import { Connection } from "@/durable-objects/map";
 import { AttackData, MagicAttack, NormalAttack } from "@/models/attacks";
 import { AttackCommand } from "@/models/commands";
-import { AttackEvent, DamagedEvent, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
+import { AttackEvent, DamagedEvent, HeroTexture, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
 import { MapLayer, TileCollision, TileSet } from "@/models/maps";
+import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
 import { Npc } from "@/models/wrath-of-toldir/npcs/npc";
 
@@ -93,12 +94,13 @@ export class EventBuilder {
         JoinEvent.addName(builder, otherPlayerName);
         JoinEvent.addCharLayer(builder, charLayerOffset);
         JoinEvent.addPos(builder, Vec2.createVec2(builder, otherPlayerPos.x, otherPlayerPos.y));
+        JoinEvent.addTexture(builder, otherPlayer.texture);
 
         eventOffsets.push(JoinEvent.endJoinEvent(builder));
         eventTypeOffsets.push(Update.JoinEvent);
     }
 
-    pushCurrentMapState(playerId: PlayerId, mapData: TiledJSON, npcs: Record<EntityId, NPC>, positionKeeper: PositionKeeper) {
+    pushCurrentMapState(playerId: PlayerId, playerTexture: HeroTexture, mapData: TiledJSON, npcs: Record<EntityId, NPC>, positionKeeper: PositionKeeper) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         // TODO: can we load the (static) map data earlier and just merge the byte buffer here
@@ -141,6 +143,7 @@ export class EventBuilder {
         MapJoinedEvent.addPos(builder, Vec2.createVec2(builder, playerPosition.x, playerPosition.y));
         MapJoinedEvent.addTilemap(builder, tilemapOffset);
         MapJoinedEvent.addNpcs(builder, npcsVector);
+        MapJoinedEvent.addTexture(builder, playerTexture);
         const eventOffset = MapJoinedEvent.endMapJoinedEvent(builder);
 
         eventOffsets.push(eventOffset);
@@ -169,10 +172,10 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.LeaveEvent);
     }
 
-    pushDamagedEvent(playerId: PlayerId, key: number, damage: number) {
+    pushDamagedEvent(playerId: PlayerId, key: number, damage: number, state: DamageState) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
-        const damagedEventOffset = DamagedEvent.createDamagedEvent(builder, key, damage);
+        const damagedEventOffset = DamagedEvent.createDamagedEvent(builder, key, damage, state);
 
         eventOffsets.push(damagedEventOffset);
         eventTypeOffsets.push(Update.DamagedEvent);

@@ -26,7 +26,7 @@ export class ArtificialIntelligence {
             const { key } = this.npcs[npcId];
             const oldPos = this.positionKeeper.getEntityPosition(npcId);
             // update game state
-            const willMove = Math.random() < 0.1;
+            const willMove = Math.random() < 0.01;
             if (willMove) {
 
                 let pos = { ...oldPos };
@@ -40,14 +40,14 @@ export class ArtificialIntelligence {
                 } else {
                     pos.y = Math.min(this.map.height, pos.y + 1);
                 }
-                this.positionKeeper.setEntityPosition(npcId, pos);
-
-
-                // inform other players
-                const players: PlayerId[] = Object.keys(this.connections);
-                this.positionKeeper.findMovementWitnesses(npcId, players, oldPos, pos, otherPlayerId => {
-                    this.eventBuilder.pushMovementEvent(otherPlayerId, pos, key);
-                });
+                if (!this.positionKeeper.isBlocked(pos)) {
+                    this.positionKeeper.setEntityPosition(npcId, pos);
+                    // inform other players
+                    const players: PlayerId[] = Object.keys(this.connections);
+                    this.positionKeeper.findMovementWitnesses(npcId, players, oldPos, pos, otherPlayerId => {
+                        this.eventBuilder.pushMovementEvent(otherPlayerId, pos, key);
+                    });
+                }
             }
         })
     }

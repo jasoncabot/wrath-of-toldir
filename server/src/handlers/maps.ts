@@ -4,7 +4,7 @@ import { RequestWithUser } from "@/middleware/auth";
 import { Request } from "itty-router";
 import { v4 as uuidv4 } from 'uuid';
 
-const durableObjectAction = (action: MapAction) => {
+export const durableObjectAction = (action: MapAction) => {
     return `http://map/?action=${action}`;
 }
 

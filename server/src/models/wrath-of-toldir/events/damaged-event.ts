@@ -2,6 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { DamageState } from '../../wrath-of-toldir/events/damage-state';
+
+
 export class DamagedEvent {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -30,8 +33,13 @@ amount():number {
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
+state():DamageState {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : DamageState.Default;
+}
+
 static startDamagedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -42,15 +50,20 @@ static addAmount(builder:flatbuffers.Builder, amount:number) {
   builder.addFieldInt16(1, amount, 0);
 }
 
+static addState(builder:flatbuffers.Builder, state:DamageState) {
+  builder.addFieldInt8(2, state, DamageState.Default);
+}
+
 static endDamagedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createDamagedEvent(builder:flatbuffers.Builder, key:number, amount:number):flatbuffers.Offset {
+static createDamagedEvent(builder:flatbuffers.Builder, key:number, amount:number, state:DamageState):flatbuffers.Offset {
   DamagedEvent.startDamagedEvent(builder);
   DamagedEvent.addKey(builder, key);
   DamagedEvent.addAmount(builder, amount);
+  DamagedEvent.addState(builder, state);
   return DamagedEvent.endDamagedEvent(builder);
 }
 }

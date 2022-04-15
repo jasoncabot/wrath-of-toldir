@@ -3,7 +3,7 @@ import { DebugText, PlayerCharacter } from '../objects/'
 
 import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
-import { AttackData, AttackEvent, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
+import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
 import { MoveCommand, JoinCommand, Action, Vec2 } from '../../models/commands';
 import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
@@ -17,6 +17,7 @@ import Monster, { MonsterTexture } from '../objects/monster';
 import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed-event';
 import { MagicAttack, NormalAttack } from '../../models/attacks';
 import { DamagedEvent } from '../../models/wrath-of-toldir/events/damaged-event';
+import { HeroTexture } from '../../models/wrath-of-toldir/events/hero-texture';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -69,7 +70,16 @@ export default class MainScene extends Phaser.Scene {
 
   preload() {
     Monster.preload(this, "slime1");
-    PlayerCharacter.preload(this, "hero1");
+    (['hero1',
+      'hero2',
+      'hero3',
+      'hero4',
+      'hero5',
+      'hero6',
+      'hero7',
+      'hero8',
+      'hero9',
+      'hero10']).forEach(hero => PlayerCharacter.preload(this, hero));
     Weapon.preload(this);
 
     this.load.html('chatbox', 'assets/html/chatbox.html');
@@ -256,7 +266,7 @@ export default class MainScene extends Phaser.Scene {
         case Update.JoinEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
-          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), join.charLayer()!, "hero1", join.key().toString());
+          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), join.charLayer()!, join.texture(), join.key().toString());
           pc.setData("name", join.name());
           this.gridEngine.addCharacter(pc.gridEngineCharacterData);
           pc.playStandAnimation(this.gridEngine.getFacingDirection(join.key().toString()));
@@ -331,12 +341,16 @@ export default class MainScene extends Phaser.Scene {
                 duration: 500,
                 yoyo: false,
                 callbackScope: this,
-                onComplete: function () {
+                onComplete: () => {
                   damage.destroy();
                 }
               });
             }
           });
+          if (event.state() == DamageState.Dead) {
+            enemy.destroy();
+            this.gridEngine.removeCharacter(event.key().toString());
+          }
           break;
         }
       }
@@ -441,7 +455,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.debugText.prefix = this.debugText.prefix = `(${event.pos()!.x()},${event.pos()!.y()})`;
 
-    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), event.charLayer()!, "hero1", "me");
+    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), event.charLayer()!, event.texture(), "me");
     this.interfaceCamera.ignore(this.player);
 
     this.cameras.main.startFollow(this.player, true);

@@ -2,7 +2,9 @@ import { AttackResult } from "@/durable-objects/combat";
 import { Connection } from "@/durable-objects/map";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
 import { Action, MoveCommand, JoinCommand, AttackCommand, AttackData } from "@/models/commands";
+import { HeroTexture } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
+import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { EntityId, MapTransition, NPC, PlayerId, ReceivedCommand, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
 import { Position, PositionKeeper } from "./position-keeper";
@@ -49,6 +51,7 @@ export class CommandQueue {
             let player = this.connections[playerId].player;
             if (!player && command.actionType() !== Action.JoinCommand) {
                 console.log(`Player with id ${playerId} does not exist players.length = ${players.length}`);
+                this.connections[playerId].socket.close(1016, "Must send JoinCommand as first command");
                 return;
             }
 
@@ -65,6 +68,7 @@ export class CommandQueue {
                     const transition: MapTransition | undefined = this.positionKeeper.getMapTransitionAtPosition(pos);
                     if (transition) {
                         this.eventBuilder.pushMapChangedEvent(playerId, transition.targetId, transition.target);
+                        this.positionKeeper.applyTransition(playerId, transition);
                         break; // skip processing a normal move
                     }
 
@@ -81,15 +85,19 @@ export class CommandQueue {
                     const join: JoinCommand = command.action(new JoinCommand());
 
                     // update game state
+                    // TODO: move name and texture out of this join commnad
+                    const textures = Object.values(HeroTexture);
+                    // a key represents a playerId on a map and is a public reference to a particular entity
                     player = {
                         key: Math.floor(Math.random() * 2147483647),
-                        name: join.name()!
+                        name: join.name()!,
+                        texture: textures[Math.floor(Math.random() * textures.length)] as HeroTexture
                     };
                     this.connections[playerId].player = player;
-                    this.positionKeeper.spawnEntityAtFreePosition(playerId);
+                    await this.positionKeeper.spawnEntityAtFreePosition(playerId);
 
                     // inform other players
-                    this.eventBuilder.pushCurrentMapState(playerId, this.map, this.npcs, this.positionKeeper);
+                    this.eventBuilder.pushCurrentMapState(playerId, player.texture, this.map, this.npcs, this.positionKeeper);
                     const playerPos = this.positionKeeper.getEntityPosition(playerId);
                     this.positionKeeper.findJoinWitnesses(playerId, players, otherPlayerId => {
                         // tell the player who joined about other players who are already here
@@ -125,15 +133,23 @@ export class CommandQueue {
 
                     // update game state
                     const damages = await this.performAttack(playerId, attack);
+                    // check if anything died
+                    damages.forEach(attack => {
+                        if (attack.state == DamageState.Dead) {
+                            delete this.npcs[attack.targetId];
+                            // increase experience
+                            // drop loop
+                        }
+                    });
 
                     // inform other players
-                    damages.forEach(({ key, damage }) => {
-                        this.eventBuilder.pushDamagedEvent(playerId, key, damage);
+                    damages.forEach(({ key, damage, state }) => {
+                        this.eventBuilder.pushDamagedEvent(playerId, key, damage, state);
                     });
                     this.positionKeeper.findAttackWitnesses(playerId, players, (otherPlayerId) => {
                         this.eventBuilder.pushAttackEvent(otherPlayerId, player!.key, attack);
-                        damages.forEach(({ key, damage }) => {
-                            this.eventBuilder.pushDamagedEvent(otherPlayerId, key, damage);
+                        damages.forEach(({ key, damage, state }) => {
+                            this.eventBuilder.pushDamagedEvent(otherPlayerId, key, damage, state);
                         });
                     });
 
@@ -158,7 +174,7 @@ export class CommandQueue {
         }
 
         const targetEntityIds = this.positionKeeper.getEntitiesAtPosition(facingPosition, true);
-        let damages: { key: number, damage: number }[] = [];
+        let damages: { attackerId: EntityId, targetId: EntityId, key: number, damage: number, state: DamageState }[] = [];
         if (targetEntityIds.size > 0) {
             const playerIdCombat = this.combat.idFromName(playerId);
             const stub = this.combat.get(playerIdCombat);
@@ -166,9 +182,16 @@ export class CommandQueue {
                 method: 'POST',
                 body: JSON.stringify({ targets: Array.from(targetEntityIds.values()) })
             });
-            (await result.json() as AttackResult[]).forEach(({ entityId, damage }) => {
+            (await result.json() as AttackResult[]).forEach(({ entityId, damage, state }) => {
                 const npc = this.npcs[entityId];
-                if (npc) damages.push({ key: npc.key, damage });
+                if (!npc) return;
+                damages.push({
+                    attackerId: playerId,
+                    targetId: entityId,
+                    key: npc.key,
+                    damage,
+                    state
+                });
             });
         }
 

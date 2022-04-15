@@ -4,6 +4,7 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 
 ## TODO List
 
+- [ ] Transitioning between maps should put you in the right position
 - [ ] Simple mobile controls using a virtual joystick
 - [ ] Chat bubbles
 - [ ] HUD - switch between physical and magical attack (numbers 1, 2, 3)

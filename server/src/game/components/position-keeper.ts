@@ -1,3 +1,4 @@
+import { durableObjectAction } from "@/handlers/maps"
 import { EntityId, MapTransition, PlayerId, TiledJSON } from "../game"
 
 export type Elevation = string
@@ -32,27 +33,36 @@ const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction
 
 type EntityIndex = Record<Elevation, Set<EntityId>>;
 
+const storageKey = (id: EntityId) => {
+    return `${id}:pos`;
+}
+
 export class PositionKeeper {
     positions: Record<EntityId, Position>
     positionIndex: Record<PositionKey, EntityIndex>
     storage: DurableObjectStorage
-    map: TiledJSON
+    map: TiledJSON | undefined
     blockedTileIdentifiers: Set<number>
+    mapsNamespace: DurableObjectNamespace
 
-    constructor(storage: DurableObjectStorage, map: TiledJSON) {
+    constructor(storage: DurableObjectStorage, nsMap: DurableObjectNamespace) {
         this.positions = {};
         this.positionIndex = {};
 
         this.storage = storage;
-        this.map = map;
-
-        // pre-populate the set of map tile identifiers that we can't walk on
+        this.mapsNamespace = nsMap;
         this.blockedTileIdentifiers = new Set<number>();
+    }
+
+    updateWithMap(map: TiledJSON) {
+        this.map = map;
+        // pre-populate the set of map tile identifiers that we can't walk on
+        this.blockedTileIdentifiers.clear();
         for (let tileset of this.map.tilesets) {
-            for (let colliion of tileset.collisions) {
+            for (let collision of tileset.collisions) {
                 const allDirections = 0b11111111; // this represents all directions are blocked, so we can't spawn here
-                if (colliion.directions === allDirections) {
-                    this.blockedTileIdentifiers.add(colliion.index);
+                if (collision.directions === allDirections) {
+                    this.blockedTileIdentifiers.add(collision.index);
                 }
             }
         }
@@ -85,6 +95,8 @@ export class PositionKeeper {
         // this is the bit that actually updates the state
         this.positions[id] = position;
 
+        this.storage.put(storageKey(id), position);
+
         // keep a map of x,y positions with the set of entities that are occupying
         // that space at various heights for fast lookup, e.g:
         // * {x, y} => [{1: [player1, player2], 2: [flyingMonster1]}]
@@ -103,8 +115,10 @@ export class PositionKeeper {
         entities.add(id);
     }
 
-    spawnEntityAtFreePosition(entityId: EntityId) {
-        let spawnPosition: Position | undefined = undefined;
+    async spawnEntityAtFreePosition(entityId: EntityId) {
+        if (!this.map) throw new Error(`Unable to spawn entity with id ${entityId} when map is undefined. Ensure map data has loaded.`);
+        let spawnPosition: Position | undefined = await this.storage.get(storageKey(entityId));
+
         while (!spawnPosition) {
             spawnPosition = {
                 x: Math.floor(Math.random() * this.map.width),
@@ -158,6 +172,7 @@ export class PositionKeeper {
     }
 
     isBlocked(position: Position) {
+        if (!this.map) return false;
         if (this.getEntitiesAtPosition(position, true).size > 0) return true;
 
         const layer = this.map.layers.find(x => x.charLayer == position.z);
@@ -169,8 +184,24 @@ export class PositionKeeper {
     }
 
     getMapTransitionAtPosition(position: Position) {
+        if (!this.map) return undefined;
         const transition = this.map.layers.find(l => l.key === position.z)?.transitions.find(t => t.x === position.x && t.y === position.y);
         return transition;
+    }
+
+    async applyTransition(entityId: EntityId, transition: MapTransition) {
+        // delete from this position keeper
+        this.clearEntityPosition(entityId);
+
+        // transfer to other map
+        const nextMapId = this.mapsNamespace.idFromName(transition.targetId);
+        let nextMap = await this.mapsNamespace.get(nextMapId);
+
+        return nextMap.fetch(durableObjectAction("store-pos"), {
+            headers: { "X-PlayerId": entityId },
+            method: 'POST',
+            body: JSON.stringify(transition.target)
+        });
     }
 
     /**

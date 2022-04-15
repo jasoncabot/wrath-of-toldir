@@ -1,7 +1,5 @@
-import { Action, AttackCommand, LeaveCommand } from "@/models/commands";
+import { Action, LeaveCommand } from "@/models/commands";
 import { ArtificialIntelligence } from "@/game/components/artificial-intelligence";
-import { AttackData, MagicAttack, NormalAttack } from "@/models/attacks";
-import { AttackResult } from "./combat";
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { CommandQueue } from "@/game/components/command-queue";
@@ -9,9 +7,8 @@ import { EntityId, NPC, Player, PlayerId, TiledJSON } from "@/game/game";
 import { EventBuilder } from "@/game/components/event-builder";
 import { loadMapData, validMaps } from "@/data/maps";
 import { Position, PositionKeeper } from "@/game/components/position-keeper";
-import { v4 as uuidv4 } from 'uuid';
 
-export type MapAction = 'store-key' | 'websocket';
+export type MapAction = 'store-key' | 'websocket' | 'store-pos';
 
 export interface Connection {
     socket: WebSocket
@@ -28,7 +25,7 @@ export class Map implements DurableObject {
     mapData: TiledJSON | undefined;
     tickCount: number = 0;
     npcs: Record<EntityId, NPC>;
-    positionKeeper!: PositionKeeper;
+    positionKeeper: PositionKeeper;
     eventBuilder: EventBuilder;
     ai!: ArtificialIntelligence;
 
@@ -41,25 +38,27 @@ export class Map implements DurableObject {
         this.mapData = undefined;
         this.npcs = {};
         this.eventBuilder = new EventBuilder();
+        this.positionKeeper = new PositionKeeper(this.state.storage, this.env.MAP);
     }
 
     initialiseMap(mapId: string) {
         this.mapData = loadMapData(mapId);
         // TODO: slice and dice these dependencies a bit better, perhaps put them in a context
-        this.positionKeeper = new PositionKeeper(this.state.storage, this.mapData);
+        this.positionKeeper.updateWithMap(this.mapData);
         this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.env.COMBAT);
         this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs);
 
-        // Create NPCs
-        // TODO: this is just temporary to see some stuff
-        for (let i = 0; i < 10; i++) {
-            const npcId = uuidv4();
-            this.npcs[npcId] = {
-                key: Math.floor(Math.random() * 2147483647),
-                type: "slime1",
-            };
-            this.positionKeeper.spawnEntityAtFreePosition(npcId);
-        }
+        // // Create NPCs
+        // // TODO: this is just temporary to see some stuff
+        // this.state.storage.list({prefix})
+        // for (let i = 0; i < 10; i++) {
+        //     const npcId = uuidv4();
+        //     this.npcs[npcId] = {
+        //         key: Math.floor(Math.random() * 2147483647),
+        //         type: "slime1",
+        //     };
+        //     this.positionKeeper.spawnEntityAtFreePosition(npcId);
+        // }
     }
 
     async fetch(request: Request) {
@@ -99,6 +98,19 @@ export class Map implements DurableObject {
                             'Content-type': 'application/json',
                         },
                         webSocket: client
+                    });
+                }
+
+                case "store-pos": {
+                    const playerId = request.headers.get('X-PlayerId')!;
+                    let pos: Position = await request.json() as Position;
+                    this.positionKeeper.setEntityPosition(playerId, pos);
+                    return new Response(JSON.stringify(pos), {
+                        status: 200,
+                        headers: {
+                            'Access-Control-Allow-Origin': this.env.FRONTEND_URI,
+                            'Content-type': 'application/json'
+                        }
                     });
                 }
 

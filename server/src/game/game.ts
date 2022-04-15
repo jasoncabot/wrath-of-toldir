@@ -1,3 +1,4 @@
+import { HeroTexture } from "@/models/events"
 import { Command } from "@/models/wrath-of-toldir/commands/command"
 import { Position } from "./components/position-keeper"
 
@@ -7,6 +8,7 @@ export type PlayerId = EntityId
 export interface Player {
     key: number
     name: string
+    texture: HeroTexture
 }
 
 export interface ReceivedCommand {
