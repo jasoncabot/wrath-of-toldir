@@ -1,19 +1,22 @@
-import { Action, LeaveCommand } from "@/models/commands";
-import { ArtificialIntelligence } from "@/game/components/artificial-intelligence";
-import { Builder, ByteBuffer } from "flatbuffers";
-import { Command } from "@/models/wrath-of-toldir/commands/command";
-import { CommandQueue } from "@/game/components/command-queue";
-import { EntityId, NPC, Player, PlayerId, TiledJSON } from "@/game/game";
-import { EventBuilder } from "@/game/components/event-builder";
 import { loadMapData, validMaps } from "@/data/maps";
+import { ArtificialIntelligence } from "@/game/components/artificial-intelligence";
+import { CommandQueue } from "@/game/components/command-queue";
+import { EventBuilder } from "@/game/components/event-builder";
 import { Position, PositionKeeper } from "@/game/components/position-keeper";
+import { EntityId, NPC, PlayerId, TiledJSON } from "@/game/game";
+import { Action, LeaveCommand } from "@/models/commands";
+import { Command } from "@/models/wrath-of-toldir/commands/command";
+import { Builder, ByteBuffer } from "flatbuffers";
+import { PlayableCharacter } from "./character";
 
 export type MapAction = 'store-key' | 'websocket' | 'store-pos';
 
 export interface Connection {
     socket: WebSocket
     quitting: boolean
-    player: Player | undefined // set after a player has 'joined' this connection
+    character: PlayableCharacter
+    publicCharacterId: number | undefined // set after a player has 'joined' this connection
+    playerId: string // identifies a player who may have up to n characters
 }
 
 const TICK_RATE = 500;
@@ -38,10 +41,11 @@ export class Map implements DurableObject {
         this.mapData = undefined;
         this.npcs = {};
         this.eventBuilder = new EventBuilder();
-        this.positionKeeper = new PositionKeeper(this.state.storage, this.env.MAP);
+        this.positionKeeper = new PositionKeeper(this.state.storage, this.env.MAP, this.env.CHARACTER);
     }
 
     initialiseMap(mapId: string) {
+        // TODO: check if we are already initialised...
         this.mapData = loadMapData(mapId);
         // TODO: slice and dice these dependencies a bit better, perhaps put them in a context
         this.positionKeeper.updateWithMap(this.mapData);
@@ -77,16 +81,26 @@ export class Map implements DurableObject {
                     if (!socketKey) {
                         return new Response("expected key", { status: 400 });
                     }
-                    const playerId = await this.state.storage.get(socketKey) as string;
-                    if (!playerId) {
-                        return new Response("invalid key", { status: 401 });
+                    const dataAssociatedWithSocket = await this.state.storage.get(socketKey)
+                        .then(data => {
+                            const parsed = JSON.parse(data as string) as { playerId: string, playableCharacter: string };
+                            return {
+                                playerId: parsed.playerId,
+                                playableCharacter: JSON.parse(parsed.playableCharacter) as PlayableCharacter
+                            }
+                        });
+                    if (!dataAssociatedWithSocket || !dataAssociatedWithSocket.playerId || !dataAssociatedWithSocket.playableCharacter) {
+                        return new Response("Unable to load character", { status: 401 });
+                    }
+                    if (dataAssociatedWithSocket.playableCharacter.region != mapId) {
+                        return new Response("Invalid map id", { status: 400 });
                     }
 
                     if (validMaps.has(mapId) && !this.mapData) {
                         this.initialiseMap(mapId);
                     }
 
-                    await this.handleSession(server, playerId);
+                    await this.handleSession(server, dataAssociatedWithSocket.playerId, dataAssociatedWithSocket.playableCharacter);
 
                     // consume this token so it can't be re-used
                     this.state.storage.delete(socketKey);
@@ -102,7 +116,7 @@ export class Map implements DurableObject {
                 }
 
                 case "store-pos": {
-                    const playerId = request.headers.get('X-PlayerId')!;
+                    const playerId = request.headers.get('X-EntityId')!;
                     let pos: Position = await request.json() as Position;
                     this.positionKeeper.setEntityPosition(playerId, pos);
                     return new Response(JSON.stringify(pos), {
@@ -116,8 +130,16 @@ export class Map implements DurableObject {
 
                 case "store-key": {
                     const playerId = request.headers.get('X-PlayerId')!;
+                    const characterId = request.headers.get('X-CharacterId')!;
                     const socketKey = request.headers.get('X-Socket-Key')!;
-                    await this.state.storage.put(socketKey, playerId);
+
+                    // one player has many characters
+                    let id = this.env.CHARACTER.idFromName(playerId);
+                    let obj = this.env.CHARACTER.get(id);
+                    const playableCharacter: string = await obj.fetch(`https://character?action=show&characterId=${characterId}`)
+                        .then(resp => resp.text());
+
+                    await this.state.storage.put(socketKey, JSON.stringify({ playerId, playableCharacter }));
                     return new Response(socketKey, {
                         status: 201,
                         headers: {
@@ -141,7 +163,22 @@ export class Map implements DurableObject {
         this.ai.process();
 
         // emit events for affected clients
-        this.eventBuilder.flush(this.connections);
+        for (const [playerId, player] of Object.entries(this.connections)) {
+            const socket = player.socket;
+            try {
+                if (player.quitting && socket.readyState !== WebSocket.READY_STATE_CLOSED) {
+                    socket.close(1011, "WebSocket broken.");
+                    continue;
+                }
+
+                const data = this.eventBuilder.buildEventLog(playerId);
+                if (!data) continue;
+
+                socket.send(data);
+            } catch (err: any) {
+                console.log(`[id:${this.mapData!.id}] [tick:${this.tickCount}] [${err.message}] Error flushing socket ...`);
+            }
+        };
 
         // check if it's time to shut down the game
         if (Object.keys(this.connections).length === 0) {
@@ -152,7 +189,7 @@ export class Map implements DurableObject {
 
         const elapsed = (new Date().getTime() - start);
         if (elapsed > TICK_RATE * 0.8) {
-            console.warn(`[id:${this.mapData?.id}] [tick:${this.tickCount}] queue-length:${this.commandQueue.size()} took too much time (${elapsed}ms) to process`);
+            console.warn(`[id:${this.mapData?.id}] [tick:${this.tickCount}] [queue-length:${this.commandQueue.size()}] took too much time (${elapsed}ms) to process`);
         }
     }
 
@@ -162,36 +199,38 @@ export class Map implements DurableObject {
         this.tickCount = 0;
     }
 
-    async handleSession(socket: WebSocket, playerId: PlayerId) {
+    async handleSession(socket: WebSocket, playerId: string, character: PlayableCharacter) {
         // Well this is our main game loop
         if (!this.intervalHandle) {
-            console.log(`[id:${this.mapData?.id}] Player connected, starting up game tick ...`);
+            console.log(`[id:${this.mapData?.id}] Player connected with character [id:${character.id}], starting up game tick ...`);
             this.intervalHandle = setInterval(this.onGameTick.bind(this), TICK_RATE);
         }
 
         socket.accept();
 
-        let connection = {
+        const connection = {
             socket,
-            player: undefined,
-            quitting: false
+            publicCharacterId: undefined,
+            character: character,
+            quitting: false,
+            playerId: playerId
         };
-        this.connections[playerId] = connection;
+        this.connections[character.id] = connection;
 
         socket.addEventListener("message", async msg => {
 
-            // TODO: check for rate limiting of playerId
+            // TODO: check for rate limiting of playerId / character
 
             const data: ArrayBuffer = msg.data as ArrayBuffer;
             let bb = new ByteBuffer(new Uint8Array(data));
 
             const action = Command.getRootAsCommand(bb);
 
-            const { player, quitting } = this.connections[playerId];
-            if ((player && !quitting) || action.actionType() == Action.JoinCommand) {
-                this.commandQueue.push(playerId, action);
+            const { publicCharacterId, quitting } = this.connections[character.id];
+            if ((publicCharacterId && !quitting) || action.actionType() == Action.JoinCommand) {
+                this.commandQueue.push(character.id, action);
             } else {
-                console.log(`Skipping command ${Action[action.actionType()]} from player ${playerId} because they are not ready or quitting`);
+                console.log(`Skipping command ${Action[action.actionType()]} from character ${character.id} because they are not ready or quitting`);
             }
         });
 
@@ -204,7 +243,7 @@ export class Map implements DurableObject {
             const actionOffset = LeaveCommand.createLeaveCommand(leaveBuilder);
             const commandOffset = Command.createCommand(leaveBuilder, 0, Action.LeaveCommand, actionOffset);
             leaveBuilder.finish(commandOffset);
-            this.commandQueue.push(playerId, Command.getRootAsCommand(leaveBuilder.dataBuffer()));
+            this.commandQueue.push(character.id, Command.getRootAsCommand(leaveBuilder.dataBuffer()));
             connection.quitting = true;
         };
         socket.addEventListener("close", closeOrErrorHandler);

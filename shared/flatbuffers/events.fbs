@@ -1,20 +1,22 @@
-include "util.fbs";
+include "maps.fbs";
 include "maps.fbs";
 include "npcs.fbs";
 include "attacks.fbs";
 
 namespace WrathOfToldir.Events;
 
-enum HeroTexture : byte { Hero1,
-Hero2,
-Hero3,
-Hero4,
-Hero5,
-Hero6,
-Hero7,
-Hero8,
-Hero9,
-Hero10 }
+enum HeroTexture : byte {
+    Hero1,
+    Hero2,
+    Hero3,
+    Hero4,
+    Hero5,
+    Hero6,
+    Hero7,
+    Hero8,
+    Hero9,
+    Hero10
+}
 
 table MoveEvent {
     key: uint32;
@@ -27,7 +29,7 @@ table JoinEvent {
     pos: Vec2;
     name: string;
     char_layer: string;
-    texture: HeroTexture;    
+    texture: HeroTexture;
 }
 
 table LeaveEvent {
@@ -39,6 +41,11 @@ table AttackEvent {
     data: WrathOfToldir.Attacks.AttackData;
 }
 
+table ChatEvent {
+    key: uint32;
+    message: string;
+}
+
 enum DamageState : byte { Default, Dead }
 
 table DamagedEvent {
@@ -48,11 +55,13 @@ table DamagedEvent {
 }
 
 table MapJoinedEvent {
+    key: uint32;
     pos: Vec2;
+    name: string;
     char_layer: string;
+    texture: HeroTexture;
     tilemap: WrathOfToldir.Maps.TileMap;
     npcs: [WrathOfToldir.Npcs.Npc];
-    texture: HeroTexture;    
 }
 
 table MapChangedEvent {
@@ -68,7 +77,8 @@ union Update {
     AttackEvent,
     MapJoinedEvent,
     MapChangedEvent,
-    DamagedEvent
+    DamagedEvent,
+    ChatEvent
 }
 
 table EventLog {

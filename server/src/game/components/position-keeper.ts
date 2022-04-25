@@ -1,4 +1,4 @@
-import { durableObjectAction } from "@/handlers/maps"
+import { durableObjectActionMap } from "@/handlers/maps"
 import { EntityId, MapTransition, PlayerId, TiledJSON } from "../game"
 
 export type Elevation = string
@@ -38,19 +38,21 @@ const storageKey = (id: EntityId) => {
 }
 
 export class PositionKeeper {
-    positions: Record<EntityId, Position>
-    positionIndex: Record<PositionKey, EntityIndex>
-    storage: DurableObjectStorage
-    map: TiledJSON | undefined
     blockedTileIdentifiers: Set<number>
+    charactersNamespace: DurableObjectNamespace
+    map: TiledJSON | undefined
     mapsNamespace: DurableObjectNamespace
+    positionIndex: Record<PositionKey, EntityIndex>
+    positions: Record<EntityId, Position>
+    storage: DurableObjectStorage
 
-    constructor(storage: DurableObjectStorage, nsMap: DurableObjectNamespace) {
+    constructor(storage: DurableObjectStorage, nsMap: DurableObjectNamespace, charactersNamespace: DurableObjectNamespace) {
         this.positions = {};
         this.positionIndex = {};
 
         this.storage = storage;
         this.mapsNamespace = nsMap;
+        this.charactersNamespace = charactersNamespace;
         this.blockedTileIdentifiers = new Set<number>();
     }
 
@@ -189,19 +191,28 @@ export class PositionKeeper {
         return transition;
     }
 
-    async applyTransition(entityId: EntityId, transition: MapTransition) {
+    async applyTransition(playerId: string, entityId: EntityId, transition: MapTransition) {
         // delete from this position keeper
         this.clearEntityPosition(entityId);
 
         // transfer to other map
         const nextMapId = this.mapsNamespace.idFromName(transition.targetId);
-        let nextMap = await this.mapsNamespace.get(nextMapId);
+        const moveMapPromise = this.mapsNamespace.get(nextMapId)
+            .fetch(durableObjectActionMap("store-pos"), {
+                headers: { "X-EntityId": entityId },
+                method: 'POST',
+                body: JSON.stringify(transition.target)
+            });
 
-        return nextMap.fetch(durableObjectAction("store-pos"), {
-            headers: { "X-PlayerId": entityId },
-            method: 'POST',
-            body: JSON.stringify(transition.target)
-        });
+        const playersCharacters = this.charactersNamespace.idFromName(playerId);
+        const updateCharRegionPromise = this.charactersNamespace.get(playersCharacters)
+            .fetch(`https://character?action=setRegion&characterId=${entityId}`, {
+                headers: { "X-EntityId": entityId },
+                method: 'POST',
+                body: transition.targetId
+            });
+
+        return Promise.all([moveMapPromise, updateCharRegionPromise]);
     }
 
     /**

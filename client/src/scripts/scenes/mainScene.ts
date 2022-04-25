@@ -5,7 +5,6 @@ import { Builder, ByteBuffer } from "flatbuffers";
 import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
 import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
 import { MoveCommand, JoinCommand, Action, Vec2 } from '../../models/commands';
-import { v4 as uuidv4 } from 'uuid';
 import { Command } from '../../models/wrath-of-toldir/commands/command';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
 import { WalkingAnimatable } from '../objects/playerCharacter';
@@ -18,6 +17,10 @@ import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed
 import { MagicAttack, NormalAttack } from '../../models/attacks';
 import { DamagedEvent } from '../../models/wrath-of-toldir/events/damaged-event';
 import { HeroTexture } from '../../models/wrath-of-toldir/events/hero-texture';
+import { ChatCommand } from '../../models/wrath-of-toldir/commands/chat-command';
+import { ChatEvent } from '../../models/wrath-of-toldir/events/chat-event';
+import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
+import ChatDialog from '../objects/chatDialog';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -40,32 +43,25 @@ enum MapSceneState {
   READY
 }
 
-const authToken = () => {
-  let token = window.sessionStorage.getItem('token');
-  if (!token) {
-    token = uuidv4();
-    window.sessionStorage.setItem('token', token);
-  }
-  return token;
-}
-
 export default class MainScene extends Phaser.Scene {
-  debugText: DebugText
-  cursors: Phaser.Types.Input.Keyboard.CursorKeys
-  player: PlayerCharacter
-  gridEngine: GridEngine
-  map: Phaser.Tilemaps.Tilemap
-  interfaceCamera: Phaser.Cameras.Scene2D.Camera;
-  onPositionChangedSubscription: any;
-  connection: WebSocket | undefined;
+  chatOverlay: ChatDialog;
   commandSequencer: number;
+  connection: WebSocket | undefined;
   currentState = MapSceneState.INITIAL;
-  chatOverlay: Phaser.GameObjects.DOMElement | undefined
+  cursors: Phaser.Types.Input.Keyboard.CursorKeys
+  debugText: DebugText
+  gridEngine: GridEngine
+  interfaceCamera: Phaser.Cameras.Scene2D.Camera;
+  map: Phaser.Tilemaps.Tilemap
+  onPositionChangedSubscription: any;
+  player: PlayerCharacter
+  playerCharacters: PlayerCharacter[];
 
   constructor() {
     super({ key: 'MainScene' });
 
     this.commandSequencer = 0;
+    this.playerCharacters = [];
   }
 
   preload() {
@@ -81,8 +77,6 @@ export default class MainScene extends Phaser.Scene {
       'hero9',
       'hero10']).forEach(hero => PlayerCharacter.preload(this, hero));
     Weapon.preload(this);
-
-    this.load.html('chatbox', 'assets/html/chatbox.html');
   }
 
   async create() {
@@ -101,13 +95,15 @@ export default class MainScene extends Phaser.Scene {
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
     this.cameras.main.ignore([this.debugText, hud]);
 
+    this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
+
     this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
-      if (!this.chatOverlay && event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
-        this.showInputDialog();
+      if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
+        this.chatOverlay.showInputDialog();
       }
     });
 
-    this.transitionToInitial("fisherswatch");
+    this.transitionToInitial(currentCharacterRegion());
   }
 
   update() {
@@ -119,44 +115,35 @@ export default class MainScene extends Phaser.Scene {
     if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
       this.applyDefaultAction();
     }
+
+    this.playerCharacters.forEach(pc => pc.updateAttachedSprites());
   }
 
-  showInputDialog() {
-    this.chatOverlay = this.add.dom(0, 576)
-      .createFromCache('chatbox')
-      .addListener('submit')
-      .setOrigin(0, 0);
-
-    this.input.keyboard.enabled = false;
-    this.input.keyboard.disableGlobalCapture();
-
-    this.chatOverlay.on('submit', _ => {
-      this.input.keyboard.enabled = true;
-      this.input.keyboard.enableGlobalCapture();
-      const message = (document.getElementById('chatmessage') as HTMLInputElement).value;
-      this.onTextEntered(message);
-      this.chatOverlay?.destroy();
-      this.chatOverlay = undefined;
-    });
-
-    document.getElementById('chatmessage')?.focus();
-    this.tweens.add({
-      targets: this.chatOverlay,
-      y: 540,
-      duration: 250,
-      ease: 'Power3'
-    });
-  }
-
-  onTextEntered(text: string) {
+  private onTextEntered(text: string) {
     // TODO: parse text and send appropriate event to server 
     // ChatEvent
     // CommandEvent
     // * /g 1:1 = move to space (1, 1)
+    if (text.length === 0) return;
     if (text.startsWith("/g")) {
       // just move us locally - this should tell the server we want to move
       const [x, y] = text.split(" ")[1].split(":");
-      this.gridEngine.setPosition("me", { x: parseInt(x, 10), y: parseInt(y, 10) }, this.gridEngine.getCharLayer('me'));
+      this.gridEngine.setPosition(this.player.identifier, { x: parseInt(x, 10), y: parseInt(y, 10) }, this.gridEngine.getCharLayer(this.player.identifier));
+      return;
+    } else if (text.startsWith("/debug")) {
+      this.debugText.visible = !this.debugText.visible;
+      return;
+    } else {
+      let builder = new Builder(text.length);
+      const messageOffset = builder.createString(text);
+      const chat = ChatCommand.createChatCommand(builder, messageOffset);
+      Command.startCommand(builder);
+      Command.addSeq(builder, ++this.commandSequencer);
+      Command.addActionType(builder, Action.ChatCommand);
+      Command.addAction(builder, chat);
+      const update = Command.endCommand(builder);
+      builder.finish(update);
+      this.connection?.send(builder.asUint8Array());
     }
   }
 
@@ -174,9 +161,7 @@ export default class MainScene extends Phaser.Scene {
       console.log(`Socket connected ...`);
       let builder = new Builder(128);
 
-      const name = uuidv4();
-      const nameOffset = builder.createString(name);
-      const join = JoinCommand.createJoinCommand(builder, nameOffset);
+      const join = JoinCommand.createJoinCommand(builder);
 
       Command.startCommand(builder);
       Command.addSeq(builder, ++this.commandSequencer);
@@ -200,7 +185,7 @@ export default class MainScene extends Phaser.Scene {
       }
     };
     ws.onerror = async (event: Event) => {
-      console.log("Socket error ..." + event);
+      console.log("Socket error ... " + event);
       ws.close();
     };
 
@@ -208,14 +193,13 @@ export default class MainScene extends Phaser.Scene {
   }
 
   submitAttack() {
-    const facing = this.gridEngine.getFacingDirection('me');
+    const facing = this.gridEngine.getFacingDirection(this.player.identifier);
 
     // TODO: attack with magic
     // if (this.selectedAttackType == AttackData.MAGIC) ...
 
     if (!this.player.weaponSprite) {
-      this.player.weaponSprite = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, 'me');
-      this.interfaceCamera.ignore(this.player.weaponSprite);
+      this.player.weaponSprite = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, this.player.identifier);
     }
     this.player.playAttackAnimation(facing);
 
@@ -235,7 +219,7 @@ export default class MainScene extends Phaser.Scene {
   applyDefaultAction() {
     // TODO: depending on what we have selected we might choose to do something different
     // than just plain attacking
-    const lookingAtPosition = this.gridEngine.getFacingPosition('me');
+    const lookingAtPosition = this.gridEngine.getFacingPosition(this.player.identifier);
     const tile = this.map.getTileAt(lookingAtPosition.x, lookingAtPosition.y);
     // TODO: if we are facing something interesting
 
@@ -266,14 +250,14 @@ export default class MainScene extends Phaser.Scene {
         case Update.JoinEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
-          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), join.charLayer()!, join.texture(), join.key().toString());
-          pc.setData("name", join.name());
+          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), join.charLayer()!, join.texture(), join.name()!, join.key().toString());
           this.gridEngine.addCharacter(pc.gridEngineCharacterData);
           pc.playStandAnimation(this.gridEngine.getFacingDirection(join.key().toString()));
-          this.interfaceCamera.ignore(pc);
+          this.playerCharacters.push(pc);
           break;
         }
         case Update.LeaveEvent: {
+          if (this.currentState !== MapSceneState.READY) break;
           const leave: LeaveEvent = update.events(i, new LeaveEvent());
           this.gridEngine.getSprite(leave.key().toString()).destroy();
           this.gridEngine.removeCharacter(leave.key().toString());
@@ -293,7 +277,6 @@ export default class MainScene extends Phaser.Scene {
 
               if (!otherPlayer.weaponSprite) {
                 otherPlayer.weaponSprite = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
-                this.interfaceCamera.ignore(otherPlayer.weaponSprite);
               }
               otherPlayer.playAttackAnimation(normalDirection);
               break;
@@ -353,6 +336,12 @@ export default class MainScene extends Phaser.Scene {
           }
           break;
         }
+        case Update.ChatEvent: {
+          const event: ChatEvent = update.events(i, new ChatEvent());
+          const sprite = this.gridEngine.getSprite(event.key().toString()) as PlayerCharacter;
+          sprite.say(event.message()!);
+          break;
+        }
       }
     }
   }
@@ -361,10 +350,9 @@ export default class MainScene extends Phaser.Scene {
     this.currentState = MapSceneState.INITIAL;
 
     // Remove old sprites
-    [this.map, this.player, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
+    [this.map, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
+    this.playerCharacters.forEach(pc => pc.destroy());
     this.children.list.filter(child => {
-      if (child instanceof PlayerCharacter && child != this.player) return true;
-      if (child instanceof Weapon) return true;
       if (child instanceof Monster) return true;
       return false;
     }).forEach(x => x.destroy());
@@ -454,9 +442,8 @@ export default class MainScene extends Phaser.Scene {
     }
 
     this.debugText.prefix = this.debugText.prefix = `(${event.pos()!.x()},${event.pos()!.y()})`;
-
-    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), event.charLayer()!, event.texture(), "me");
-    this.interfaceCamera.ignore(this.player);
+    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), event.charLayer()!, event.texture(), event.name()!, event.key().toString());
+    this.playerCharacters.push(this.player);
 
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
@@ -473,12 +460,11 @@ export default class MainScene extends Phaser.Scene {
       const sprite = new Monster(this, npc.pos()!.x(), npc.pos()!.y(), npc.charLayer()!, npc.texture()! as MonsterTexture, npc.key().toString());
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
-      this.interfaceCamera.ignore(sprite);
     }
 
     this.onPositionChangedSubscription = this.gridEngine.positionChangeStarted().subscribe(({ charId, enterTile }) => {
       // we only care about ourselves
-      if (charId !== "me") return;
+      if (charId !== this.player.identifier) return;
 
       // show our current location in the debug text
       this.debugText.prefix = `(${enterTile.x},${enterTile.y})`;
@@ -500,7 +486,7 @@ export default class MainScene extends Phaser.Scene {
     });
 
     // Player Animations on movement
-    this.player.playStandAnimation(this.gridEngine.getFacingDirection('me'));
+    this.player.playStandAnimation(this.gridEngine.getFacingDirection(this.player.identifier));
     this.gridEngine.movementStarted().subscribe(({ charId, direction }) => {
       const sprite = this.gridEngine.getSprite(charId) as unknown as WalkingAnimatable;
       sprite.playWalkAnimation(direction);
@@ -511,12 +497,19 @@ export default class MainScene extends Phaser.Scene {
       sprite.playStandAnimation(direction);
     });
 
+    this.gridEngine.directionChanged().subscribe(({ charId, direction }) => {
+      const sprite = this.gridEngine.getSprite(charId) as unknown as WalkingAnimatable;
+      sprite.playStandAnimation(direction);
+    });
+
     this.currentState = MapSceneState.READY;
   }
 }
 async function fetchConnectionToken(mapId: string) {
-  const apiURI = `${process.env.API_URI}/api/map/${mapId}`;
-  const response = await fetch(apiURI, { headers: { 'Authorization': `Bearer ${authToken()}` } });
+  const apiURI = `${process.env.API_URI}/api/map/${mapId}?characterId=${currentCharacterToken()}`;
+  const response = await fetch(apiURI, {
+    headers: { 'Authorization': `Bearer ${authToken()}` }
+  });
   if (!response) {
     throw new Error("Failed to fetch WebSocket connection token. Do you have an auth token?");
   }

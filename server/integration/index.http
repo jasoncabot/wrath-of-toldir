@@ -1,8 +1,27 @@
+@playerId = {{$guid}}
+
+### Create character
+# @name create
+POST http://127.0.0.1:8787/api/characters
+Content-type: application/json
+Authorization: Bearer 12345
+
+{
+    "name": "{{$guid}}",
+    "texture": "hero1"
+}
+
+### List characters
+GET http://127.0.0.1:8787/api/characters
+Content-type: application/json
+Authorization: Bearer 12345
+
+
 ### Show map fairweather
 # @name show
 GET http://127.0.0.1:8787/api/map/fisherswatch
 Content-type: application/json
-Authorization: Bearer {{$guid}}
+Authorization: Bearer {{playerId}}
 
 ### Connect WebSocket
 

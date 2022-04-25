@@ -1,5 +1,6 @@
 export { AttackData, unionToAttackData, unionListToAttackData } from './wrath-of-toldir/attacks/attack-data';
 export { AttackEvent } from './wrath-of-toldir/events/attack-event';
+export { ChatEvent } from './wrath-of-toldir/events/chat-event';
 export { DamageState } from './wrath-of-toldir/events/damage-state';
 export { DamagedEvent } from './wrath-of-toldir/events/damaged-event';
 export { HeroTexture } from './wrath-of-toldir/events/hero-texture';

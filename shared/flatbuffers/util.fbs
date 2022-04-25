@@ -1,6 +1,0 @@
-namespace WrathOfToldir;
-
-struct Vec2 {
-  x:short;
-  y:short;
-}

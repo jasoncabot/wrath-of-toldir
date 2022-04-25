@@ -1,17 +1,17 @@
-import { Connection } from "@/durable-objects/map";
 import { AttackData, MagicAttack, NormalAttack } from "@/models/attacks";
 import { AttackCommand } from "@/models/commands";
 import { AttackEvent, DamagedEvent, HeroTexture, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
 import { MapLayer, TileCollision, TileSet } from "@/models/maps";
+import { ChatEvent } from "@/models/wrath-of-toldir/events/chat-event";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
 import { Npc } from "@/models/wrath-of-toldir/npcs/npc";
-
 import { Builder } from "flatbuffers";
-import { EntityId, NPC, Player, PlayerId, TiledJSON } from "../game";
+import { EntityId, NPC, PlayerId, TiledJSON } from "../game";
 import { Position, PositionKeeper } from "./position-keeper";
 
 type Effects = { builder: Builder, eventOffsets: number[], eventTypeOffsets: number[] };
+export type PlayerJoinData = { key: number, name: string, texture: HeroTexture, position: Position };
 
 export class EventBuilder {
     private tickEvents: Record<PlayerId, Effects>;
@@ -20,7 +20,7 @@ export class EventBuilder {
         this.tickEvents = {};
     }
 
-    tickEventsForPlayer(playerId: PlayerId) {
+    private tickEventsForPlayer(playerId: PlayerId) {
         let data = this.tickEvents[playerId];
         if (!data) {
             data = {
@@ -33,41 +33,25 @@ export class EventBuilder {
         return data;
     }
 
-    popEventsForPlayer(playerId: PlayerId) {
+    private popEventsForPlayer(playerId: PlayerId) {
         const events = this.tickEvents[playerId];
         delete this.tickEvents[playerId];
         return events;
     }
 
-    flush(connections: Record<PlayerId, Connection>) {
-        for (const [playerId, player] of Object.entries(connections)) {
-            try {
-                if (player.quitting && player.socket.readyState !== WebSocket.READY_STATE_CLOSED) {
-                    player.socket.close(1011, "WebSocket broken.");
-                    return;
-                }
-
-                this.flushToSocket(playerId, player.socket);
-            } catch (err) {
-                console.error(err);
-            }
-        };
-    }
-
-    flushToSocket(playerId: string, socket: WebSocket) {
+    buildEventLog(playerId: string): Uint8Array | undefined {
         const events = this.popEventsForPlayer(playerId);
-        if (events) {
-            const { builder, eventOffsets, eventTypeOffsets } = events;
-            const eventVector = EventLog.createEventsVector(builder, eventOffsets);
-            const eventTypeVector = EventLog.createEventsTypeVector(builder, eventTypeOffsets);
-            EventLog.startEventLog(builder);
-            EventLog.addEvents(builder, eventVector);
-            EventLog.addEventsType(builder, eventTypeVector);
-            const update = EventLog.endEventLog(builder);
-            builder.finish(update);
+        if (!events) return undefined;
+        const { builder, eventOffsets, eventTypeOffsets } = events;
+        const eventVector = EventLog.createEventsVector(builder, eventOffsets);
+        const eventTypeVector = EventLog.createEventsTypeVector(builder, eventTypeOffsets);
+        EventLog.startEventLog(builder);
+        EventLog.addEvents(builder, eventVector);
+        EventLog.addEventsType(builder, eventTypeVector);
+        const update = EventLog.endEventLog(builder);
+        builder.finish(update);
 
-            socket.send(builder.asUint8Array());
-        }
+        return builder.asUint8Array();
     }
 
     pushMovementEvent(playerId: PlayerId, pos: Position, key: number) {
@@ -84,23 +68,22 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.MoveEvent);
     }
 
-    pushJoinEvent(playerId: PlayerId, otherPlayer: Player, otherPlayerPos: Position) {
+    pushJoinEvent(playerId: PlayerId, other: PlayerJoinData) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
-        const otherPlayerName = builder.createString(otherPlayer.name);
-        const charLayerOffset = builder.createString(otherPlayerPos.z);
+        const otherPlayerName = builder.createString(other.name);
+        const charLayerOffset = builder.createString(other.position.z);
         JoinEvent.startJoinEvent(builder);
-        JoinEvent.addKey(builder, otherPlayer.key);
+        JoinEvent.addKey(builder, other.key);
+        JoinEvent.addPos(builder, Vec2.createVec2(builder, other.position.x, other.position.y));
         JoinEvent.addName(builder, otherPlayerName);
         JoinEvent.addCharLayer(builder, charLayerOffset);
-        JoinEvent.addPos(builder, Vec2.createVec2(builder, otherPlayerPos.x, otherPlayerPos.y));
-        JoinEvent.addTexture(builder, otherPlayer.texture);
-
+        JoinEvent.addTexture(builder, other.texture);
         eventOffsets.push(JoinEvent.endJoinEvent(builder));
         eventTypeOffsets.push(Update.JoinEvent);
     }
 
-    pushCurrentMapState(playerId: PlayerId, playerTexture: HeroTexture, mapData: TiledJSON, npcs: Record<EntityId, NPC>, positionKeeper: PositionKeeper) {
+    pushCurrentMapState(playerId: PlayerId, playerData: PlayerJoinData, mapData: TiledJSON, npcs: Record<EntityId, NPC>, positionKeeper: PositionKeeper) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         // TODO: can we load the (static) map data earlier and just merge the byte buffer here
@@ -130,20 +113,22 @@ export class EventBuilder {
             Npc.startNpc(builder);
             Npc.addKey(builder, npc.key);
             Npc.addTexture(builder, textureOffset);
-            Npc.addCharLayer(builder, charLayerOffset);
             Npc.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y))
+            Npc.addCharLayer(builder, charLayerOffset);
             return Npc.endNpc(builder);
         })
         const npcsVector = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
 
-        const playerPosition = positionKeeper.getEntityPosition(playerId);
-        const charLayerOffset = builder.createString(playerPosition.z);
+        const nameOffset = builder.createString(playerData.name);
+        const charLayerOffset = builder.createString(playerData.position.z);
         MapJoinedEvent.startMapJoinedEvent(builder);
+        MapJoinedEvent.addKey(builder, playerData.key);
+        MapJoinedEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
+        MapJoinedEvent.addName(builder, nameOffset);
         MapJoinedEvent.addCharLayer(builder, charLayerOffset);
-        MapJoinedEvent.addPos(builder, Vec2.createVec2(builder, playerPosition.x, playerPosition.y));
+        MapJoinedEvent.addTexture(builder, playerData.texture);
         MapJoinedEvent.addTilemap(builder, tilemapOffset);
         MapJoinedEvent.addNpcs(builder, npcsVector);
-        MapJoinedEvent.addTexture(builder, playerTexture);
         const eventOffset = MapJoinedEvent.endMapJoinedEvent(builder);
 
         eventOffsets.push(eventOffset);
@@ -206,4 +191,12 @@ export class EventBuilder {
         eventOffsets.push(AttackEvent.endAttackEvent(builder));
         eventTypeOffsets.push(Update.AttackEvent);
     }
+
+    pushChatEvent(playerId: PlayerId, key: number, message: string) {
+        const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
+        const messageOffset = builder.createString(message);
+        eventOffsets.push(ChatEvent.createChatEvent(builder, key, messageOffset));
+        eventTypeOffsets.push(Update.ChatEvent);
+    }
+
 }

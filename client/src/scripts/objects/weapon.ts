@@ -1,11 +1,13 @@
 import { Direction } from "grid-engine";
+import { MainScene } from "../scenes";
 import { normalisedFacingDirection } from "./playerCharacter";
 
 export default class Weapon extends Phaser.Physics.Arcade.Sprite {
 
-    constructor(scene: Phaser.Scene, x: number, y: number, key: string) {
+    constructor(scene: MainScene, x: number, y: number, key: string) {
         super(scene, x, y, key + '_sword', 0);
         scene.add.existing(this);
+        scene.interfaceCamera.ignore(this);
     }
 
     playAttackAnimation(direction: Direction) {

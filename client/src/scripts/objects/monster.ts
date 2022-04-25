@@ -1,4 +1,5 @@
 import { CharacterData, Direction, GridEngine } from "grid-engine";
+import { MainScene } from "../scenes";
 import { WalkingAnimatable } from "./playerCharacter";
 
 export type MonsterTexture = 'slime1'
@@ -23,7 +24,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
     gridEngineCharacterData: CharacterData;
     walkingState: "walk" | "stand" | "attack";
 
-    constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: MonsterTexture, identifier: string) {
+    constructor(scene: MainScene, x: number, y: number, z: string, texture: MonsterTexture, identifier: string) {
         super(scene, 0, 0, texture, 0);
         this.identifier = identifier;
         this.monsterTexture = texture;
@@ -41,6 +42,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
         this.walkingState = "stand";
 
         scene.add.existing(this);
+        scene.interfaceCamera.ignore(this);
     }
 
     getStopFrame(direction: Direction): number {

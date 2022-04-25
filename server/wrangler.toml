@@ -3,8 +3,6 @@ type = "javascript"
 
 account_id = ""
 workers_dev = true
-# route = ""
-# zone_id = ""
 
 compatibility_date = "2022-03-12"
 compatibility_flags = []
@@ -12,7 +10,8 @@ compatibility_flags = []
 [durable_objects]
 bindings = [
   { name = "MAP", class_name = "Map" },
-  { name = "COMBAT", class_name = "Combat" }
+  { name = "COMBAT", class_name = "Combat" },
+  { name = "CHARACTER", class_name = "Character" }
 ]
 
 [build]
@@ -28,14 +27,18 @@ durable_objects_persist = true
 
 [[migrations]]
 tag = "v1"
-new_classes = ["Map", "Combat"]
+new_classes = ["Map"]
 
 [[migrations]]
 tag = "v2"
 new_classes = ["Combat"]
 
+[[migrations]]
+tag = "v3"
+new_classes = ["Character"]
+
 [vars]
-FRONTEND_URI="http://localhost:8080"
+FRONTEND_URI="http://192.168.1.40:8080"
 
 [env.production]
 name = "wrath-of-toldir-server"
@@ -44,7 +47,8 @@ vars = { FRONTEND_URI = "https://wot.jasoncabot.com" }
 [env.production.durable_objects]
 bindings = [
   { name = "MAP", class_name = "Map" },
-  { name = "COMBAT", class_name = "Combat" }
+  { name = "COMBAT", class_name = "Combat" },
+  { name = "CHARACTER", class_name = "Character" }
 ]
 
 [[env.production.migrations]]
@@ -54,3 +58,7 @@ new_classes = ["Map"]
 [[env.production.migrations]]
 tag = "v2"
 new_classes = ["Combat"]
+
+[[env.production.migrations]]
+tag = "v3"
+new_classes = ["Character"]

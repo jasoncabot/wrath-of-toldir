@@ -1,5 +1,6 @@
 import { CharacterData, Direction, GridEngine } from "grid-engine";
 import { HeroTexture } from "../../models/wrath-of-toldir/events/hero-texture";
+import { MainScene } from "../scenes";
 import Weapon from "./weapon";
 
 export interface WalkingAnimatable {
@@ -43,11 +44,14 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   gridEngineCharacterData: CharacterData;
   canAttack: boolean
   weaponSprite: Weapon | undefined;
+  nameBadge: Phaser.GameObjects.Text;
+  speechBubble: Phaser.GameObjects.Text;
   walkingState: "walk" | "stand" | "attack";
 
-  constructor(scene: Phaser.Scene, x: number, y: number, z: string, texture: HeroTexture, identifier: string) {
+  constructor(scene: MainScene, x: number, y: number, z: string, texture: HeroTexture, name: string, identifier: string) {
     super(scene, 0, 0, asSpriteTexture(texture), 0);
     this.identifier = identifier;
+    this.name = name;
     this.gridEngineCharacterData = {
       id: identifier,
       sprite: this,
@@ -63,6 +67,29 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     this.walkingState = "stand";
 
     scene.add.existing(this);
+
+    this.nameBadge = scene.add.text(this.getCenter().x, this.getCenter().y, name, {
+      color: '#fff',
+      fontSize: '10px',
+      fontFamily: "'Verdana'"
+    }).setDepth(this.depth + 1).setOrigin(0.5, 0).setShadow(0, 1, '#694f62');
+
+    this.speechBubble = scene.add.text(this.getCenter().x, this.getCenter().y, "", {
+      color: '#ffffff',
+      fontSize: '12px',
+      fontFamily: "'Verdana'"
+    }).setDepth(this.depth + 1).setOrigin(0.5, 1).setVisible(false);
+
+    scene.interfaceCamera.ignore([this, this.nameBadge, this.speechBubble]);
+  }
+
+  say(message: string) {
+    this.speechBubble.text = message;
+    // TODO: animation here
+    this.speechBubble.visible = true;
+    setTimeout(() => {
+      this.speechBubble.visible = false;
+    }, 1000);
   }
 
   getStopFrame(direction: Direction): number {
@@ -113,6 +140,25 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
         this.playStandAnimation(direction);
       }
     });
+  }
+
+  updateAttachedSprites() {
+    // update anything attached to this player
+    if (this.weaponSprite && this.weaponSprite.visible) {
+      this.weaponSprite.setPosition(this.getCenter().x, this.getCenter().y);
+    }
+
+    this.nameBadge.setPosition(this.getCenter().x, this.getBottomCenter().y).setDepth(this.depth + 1);
+    if (this.speechBubble.visible) {
+      this.speechBubble.setPosition(this.getCenter().x, this.getTopCenter().y).setDepth(this.depth + 1);
+    }
+  }
+
+  destroy(fromScene?: boolean): void {
+    this.weaponSprite?.destroy(fromScene);
+    this.nameBadge?.destroy(fromScene);
+    this.speechBubble?.destroy(fromScene);
+    super.destroy(fromScene);
   }
 
   static preload = (scene: Phaser.Scene, texture: string) => {
@@ -252,11 +298,6 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
       if (angleToPointer >= 1.96349540849) direction = Direction.UP_RIGHT;
 
       moveInDirection(direction);
-    }
-
-    // update anything attached to our player
-    if (this.weaponSprite && this.weaponSprite.visible) {
-      this.weaponSprite.setPosition(this.getCenter().x, this.getCenter().y);
     }
   }
 }

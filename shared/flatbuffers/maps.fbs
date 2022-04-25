@@ -1,3 +1,10 @@
+namespace WrathOfToldir;
+
+struct Vec2 {
+  x:short;
+  y:short;
+}
+
 namespace WrathOfToldir.Maps;
 
 table TileCollision {

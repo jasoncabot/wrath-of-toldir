@@ -8,7 +8,6 @@ table MoveCommand {
 }
 
 table JoinCommand {
-    name: string;
 }
 
 table LeaveCommand {
@@ -18,11 +17,16 @@ table AttackCommand {
     data: WrathOfToldir.Attacks.AttackData;
 }
 
+table ChatCommand {
+    message: string;
+}
+
 union Action {
     MoveCommand,
     JoinCommand,
     LeaveCommand,
-    AttackCommand
+    AttackCommand,
+    ChatCommand
 }
 
 table Command {

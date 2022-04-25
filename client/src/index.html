@@ -25,16 +25,8 @@
     <link rel="apple-touch-icon" type="image/png" sizes="512x512" href="./icons/icons-512.png" />
 
     <link rel="shortcut icon" href="./favicon.ico" type="image/x-icon" />
-
+    
     <title><%= htmlWebpackPlugin.options.gameName %></title>
-    <style>
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        background-color: #2e222f;
-      }
-    </style>
 
     <noscript>Please enable javascript to continue using this application.</noscript>
 
@@ -48,6 +40,7 @@
     </script> -->
   </head>
   <body>
-    <div id="phaser-game"></div>
+    <div id="root" class="dark">
+    </div>
   </body>
 </html>

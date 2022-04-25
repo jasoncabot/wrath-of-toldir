@@ -20,19 +20,8 @@ static getSizePrefixedRootAsJoinCommand(bb:flatbuffers.ByteBuffer, obj?:JoinComm
   return (obj || new JoinCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-name():string|null
-name(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-name(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
-}
-
 static startJoinCommand(builder:flatbuffers.Builder) {
-  builder.startObject(1);
-}
-
-static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(0, nameOffset, 0);
+  builder.startObject(0);
 }
 
 static endJoinCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -40,9 +29,8 @@ static endJoinCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createJoinCommand(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createJoinCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
   JoinCommand.startJoinCommand(builder);
-  JoinCommand.addName(builder, nameOffset);
   return JoinCommand.endJoinCommand(builder);
 }
 }

@@ -6,6 +6,7 @@ import { RequestWithUser, requireUser } from './middleware/auth';
 
 const router = Router<RequestWithUser>({ base: '/api' })
   .get('/characters', withUser, requireUser, CharacterHandler.list)
+  .post('/characters', withUser, requireUser, CharacterHandler.create)
   .get('/map/:id/connection', MapHandler.connect)
   .get('/map/:id', withUser, requireUser, MapHandler.show)
   .options('*', (_, env: Bindings) => new Response(null, {
@@ -25,4 +26,5 @@ const worker: ExportedHandler<Bindings> = {
 
 export { Map } from "./durable-objects/map";
 export { Combat } from "./durable-objects/combat";
+export { Character } from "./durable-objects/character";
 export default worker;

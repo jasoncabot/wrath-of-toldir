@@ -1,10 +1,14 @@
-const path = require('path')
-const CopyWebpackPlugin = require('copy-webpack-plugin')
-const HtmlWebpackPlugin = require('html-webpack-plugin')
+const path = require('path');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 const Dotenv = require('dotenv-webpack');
 
+const imageInlineSizeLimit = parseInt(
+  process.env.IMAGE_INLINE_SIZE_LIMIT || '10000'
+);
+
 module.exports = {
-  entry: ['./src/scripts/game.ts', './webpack/credits.js'],
+  entry: ['./src/scripts/game.tsx', './webpack/credits.js'],
   output: {
     path: path.resolve(__dirname, '../dist'),
     filename: '[name].bundle.js',
@@ -14,7 +18,53 @@ module.exports = {
     extensions: ['.ts', '.tsx', '.js']
   },
   module: {
-    rules: [{ test: /\.tsx?$|\.jsx?$/, include: path.join(__dirname, '../src'), loader: 'ts-loader' }]
+    strictExportPresence: true,
+    rules: [
+      {
+        test: /\.tsx?$|\.jsx?$/,
+        include: path.join(__dirname, '../src'),
+        loader: 'ts-loader'
+      },
+      {
+        test: /\.css$/i,
+        use: [
+          "style-loader",
+          {
+            loader: "css-loader",
+            options: { importLoaders: 1 },
+          },
+          {
+            loader: "postcss-loader",
+            options: {
+              postcssOptions: {
+                plugins: [
+                  [
+                    "tailwindcss",
+                    {
+                    },
+                  ],
+                  [
+                    "autoprefixer",
+                    {
+                    },
+                  ],
+                ],
+              },
+            },
+          },
+        ],
+      },
+      {
+        test: [/\.bmp$/, /\.gif$/, /\.jpe?g$/, /\.png$/],
+        type: 'asset',
+        parser: {
+          dataUrlCondition: {
+            maxSize: imageInlineSizeLimit,
+          },
+        },
+      },
+
+    ]
   },
   optimization: {
     splitChunks: {
@@ -29,7 +79,7 @@ module.exports = {
     }
   },
   plugins: [
-    new Dotenv({ 
+    new Dotenv({
       safe: true,
       systemvars: true
     }),
