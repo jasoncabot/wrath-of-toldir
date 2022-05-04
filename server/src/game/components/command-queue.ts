@@ -190,6 +190,9 @@ export class CommandQueue {
             }
         }
         this.commands = [];
+
+        // TODO: Process any scheduled commands, for example an enemy moving or spawning or delayed cooldown
+        // due to happen on a particular tick
     }
 
     async performAttack(playerId: PlayerId, attack: AttackCommand) {

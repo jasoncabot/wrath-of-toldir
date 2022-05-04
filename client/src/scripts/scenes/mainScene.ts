@@ -1,26 +1,26 @@
-import { Direction, GridEngine } from 'grid-engine'
-import { DebugText, PlayerCharacter } from '../objects/'
-
 import { Builder, ByteBuffer } from "flatbuffers";
-import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
-import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Npc, Update } from '../../models/events';
-import { MoveCommand, JoinCommand, Action, Vec2 } from '../../models/commands';
-import { Command } from '../../models/wrath-of-toldir/commands/command';
+import { Direction, GridEngine } from 'grid-engine';
+import { ChatMessage } from "../../components/ChatArea";
+import { MagicAttack, NormalAttack } from '../../models/attacks';
+import { Action, JoinCommand, MoveCommand, Vec2 } from '../../models/commands';
+import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
+import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
-import { WalkingAnimatable } from '../objects/playerCharacter';
-import Weapon from '../objects/weapon';
+import { ChatCommand } from '../../models/wrath-of-toldir/commands/chat-command';
+import { Command } from '../../models/wrath-of-toldir/commands/command';
+import { ChatEvent } from '../../models/wrath-of-toldir/events/chat-event';
+import { DamagedEvent } from '../../models/wrath-of-toldir/events/damaged-event';
+import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
+import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed-event';
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
-import { MapLayer, TileCollision, TileSet } from '../../models/maps';
-import Monster, { MonsterTexture } from '../objects/monster';
-import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed-event';
-import { MagicAttack, NormalAttack } from '../../models/attacks';
-import { DamagedEvent } from '../../models/wrath-of-toldir/events/damaged-event';
-import { HeroTexture } from '../../models/wrath-of-toldir/events/hero-texture';
-import { ChatCommand } from '../../models/wrath-of-toldir/commands/chat-command';
-import { ChatEvent } from '../../models/wrath-of-toldir/events/chat-event';
-import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
+import { DebugText, PlayerCharacter } from '../objects/';
 import ChatDialog from '../objects/chatDialog';
+import Monster, { MonsterTexture } from '../objects/monster';
+import { WalkingAnimatable } from '../objects/playerCharacter';
+import Weapon from '../objects/weapon';
+import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
+
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -91,7 +91,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.interfaceCamera = this.cameras.add();
 
-    this.debugText = new DebugText(this);
+    this.debugText = new DebugText(this).setVisible(false);
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
     this.cameras.main.ignore([this.debugText, hud]);
 
@@ -99,7 +99,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
       if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
-        this.chatOverlay.showInputDialog();
+        this.chatOverlay.focus();
       }
     });
 
@@ -110,9 +110,9 @@ export default class MainScene extends Phaser.Scene {
     if (this.currentState !== MapSceneState.READY) return;
 
     this.debugText.update();
-    this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer);
+    this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer, this.input.isOver);
 
-    if ((this.cursors.shift.isDown && this.input.activePointer.isDown) || this.cursors.space.isDown) {
+    if ((this.cursors.shift.isDown && this.input.activePointer.isDown && this.input.isOver) || this.cursors.space.isDown) {
       this.applyDefaultAction();
     }
 
@@ -179,14 +179,11 @@ export default class MainScene extends Phaser.Scene {
       this.applyUpdate(EventLog.getRootAsEventLog(bb));
     };
     ws.onclose = async (event: CloseEvent) => {
-      console.log(`Socket closed (${event.code}) ... `);
-      if (event.code !== 1000) { // considered a normal, clean exit, then try to reconnect
-        this.transitionToInitial(mapId);
-      }
+      console.log(`Socket closed (${event.code} reason: ${event.reason}) ... `);
     };
     ws.onerror = async (event: Event) => {
       console.log("Socket error ... " + event);
-      ws.close();
+      ws.close(1000);
     };
 
     return ws;
@@ -340,6 +337,9 @@ export default class MainScene extends Phaser.Scene {
           const event: ChatEvent = update.events(i, new ChatEvent());
           const sprite = this.gridEngine.getSprite(event.key().toString()) as PlayerCharacter;
           sprite.say(event.message()!);
+          document.dispatchEvent(new CustomEvent<ChatMessage>('chat-event', {
+            detail: { name: sprite.name, message: event.message()! }
+          }));
           break;
         }
       }

@@ -248,7 +248,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     });
   }
 
-  applyMovement(gridEngine: GridEngine, cursors: Phaser.Types.Input.Keyboard.CursorKeys, pointer: Phaser.Input.Pointer): void {
+  applyMovement(gridEngine: GridEngine, cursors: Phaser.Types.Input.Keyboard.CursorKeys, pointer: Phaser.Input.Pointer, isPointerInGameArea: boolean): void {
 
     const moveInDirection = (direction: Direction) => {
       if (cursors.shift.isDown) {
@@ -283,7 +283,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
       }
     }
 
-    if (pointer.isDown) {
+    if (pointer.isDown && isPointerInGameArea) {
       pointer.updateWorldPoint(this.scene.cameras.main);
 
       const angleToPointer = Phaser.Math.Angle.BetweenPoints({ x: pointer.worldX, y: pointer.worldY }, this.getCenter());

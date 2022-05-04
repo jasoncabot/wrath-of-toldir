@@ -1,5 +1,5 @@
 import WebFontFile from "../objects/WebFontFile";
-import { hero1, hero2, hero3, hero4, hero5, hero6, hero7, hero8, hero9, hero10 } from './../../assets/spritesheets/Sprites/Heroes/';
+import { textureImages, textures } from './../../assets/spritesheets/Sprites/Heroes/';
 
 export default class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -20,16 +20,11 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.spritesheet('windows', 'assets/spritesheets/Tilesets/Rural Village Doors Windows48.png', { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('collisions', 'assets/spritesheets/Tilesets/Collisions.png', { frameWidth: 48, frameHeight: 48 });
 
-    this.load.spritesheet('hero1', hero1, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero2', hero2, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero3', hero3, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero4', hero4, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero5', hero5, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero6', hero6, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero7', hero7, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero8', hero8, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero9', hero9, { frameWidth: 48, frameHeight: 48 });
-    this.load.spritesheet('hero10', hero10, { frameWidth: 48, frameHeight: 48 });
+    for (let index = 0; index < textures.length; index++) {
+      const key = textures[index];
+      const value = textureImages[index];
+      this.load.spritesheet(key, value, { frameWidth: 48, frameHeight: 48 });
+    }
     this.load.spritesheet('sword', 'assets/spritesheets/Sprites/Weapons/sword-01.png', { frameWidth: 144, frameHeight: 144 });
     this.load.spritesheet('slime1', 'assets/spritesheets/Sprites/Monsters/Slime 01 48.png', { frameWidth: 48, frameHeight: 48 });
 

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { PlayableCharacter } from '../../components/App';
+import { PlayableCharacter } from '../../components/CharacterList';
 
 const storage = window.sessionStorage;
 

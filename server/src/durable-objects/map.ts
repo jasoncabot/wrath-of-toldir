@@ -200,9 +200,11 @@ export class Map implements DurableObject {
     }
 
     async handleSession(socket: WebSocket, playerId: string, character: PlayableCharacter) {
+        const characterId = character.id;
+
         // Well this is our main game loop
         if (!this.intervalHandle) {
-            console.log(`[id:${this.mapData?.id}] Player connected with character [id:${character.id}], starting up game tick ...`);
+            console.log(`[id:${this.mapData?.id}] Player connected with character [id:${characterId}], starting up game tick ...`);
             this.intervalHandle = setInterval(this.onGameTick.bind(this), TICK_RATE);
         }
 
@@ -215,22 +217,27 @@ export class Map implements DurableObject {
             quitting: false,
             playerId: playerId
         };
-        this.connections[character.id] = connection;
+        this.connections[characterId] = connection;
 
         socket.addEventListener("message", async msg => {
 
             // TODO: check for rate limiting of playerId / character
+
+            if (!this.connections[characterId]) {
+                console.log(`No connection data found for character ${characterId}`);
+                return;
+            };
 
             const data: ArrayBuffer = msg.data as ArrayBuffer;
             let bb = new ByteBuffer(new Uint8Array(data));
 
             const action = Command.getRootAsCommand(bb);
 
-            const { publicCharacterId, quitting } = this.connections[character.id];
+            const { publicCharacterId, quitting } = this.connections[characterId];
             if ((publicCharacterId && !quitting) || action.actionType() == Action.JoinCommand) {
-                this.commandQueue.push(character.id, action);
+                this.commandQueue.push(characterId, action);
             } else {
-                console.log(`Skipping command ${Action[action.actionType()]} from character ${character.id} because they are not ready or quitting`);
+                console.log(`Skipping command ${Action[action.actionType()]} from character ${characterId} because they are not ready or quitting`);
             }
         });
 
@@ -243,7 +250,7 @@ export class Map implements DurableObject {
             const actionOffset = LeaveCommand.createLeaveCommand(leaveBuilder);
             const commandOffset = Command.createCommand(leaveBuilder, 0, Action.LeaveCommand, actionOffset);
             leaveBuilder.finish(commandOffset);
-            this.commandQueue.push(character.id, Command.getRootAsCommand(leaveBuilder.dataBuffer()));
+            this.commandQueue.push(characterId, Command.getRootAsCommand(leaveBuilder.dataBuffer()));
             connection.quitting = true;
         };
         socket.addEventListener("close", closeOrErrorHandler);

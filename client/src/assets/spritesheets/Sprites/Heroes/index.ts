@@ -9,7 +9,7 @@ import hero8 from './Hero 04a 48.png';
 import hero9 from './Hero 05 48.png';
 import hero10 from './Hero 05a 48.png';
 
-export {
+export const textureImages = [
     hero1,
     hero2,
     hero3,
@@ -20,4 +20,6 @@ export {
     hero8,
     hero9,
     hero10
-}
+];
+
+export const textures = ['hero1', 'hero2', 'hero3', 'hero4', 'hero5', 'hero6', 'hero7', 'hero8', 'hero9', 'hero10'];
