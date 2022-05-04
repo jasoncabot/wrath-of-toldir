@@ -4,16 +4,16 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 
 ## TODO List
 
-- [ ] Transitioning between maps should put you in the right position
 - [ ] Simple mobile controls using a virtual joystick
-- [ ] Chat bubbles
 - [ ] HUD - switch between physical and magical attack (numbers 1, 2, 3)
 - [ ] Magic Attacks
 - [ ] Joining a map should only tell you about stuff you can see (so not all people / npcs and their positions)
-- [ ] Attacks should kill NPC
 - [ ] Item system should hold inventory
 - [ ] Loot items
 - [ ] Water should be animated
+- [X] Attacks should kill NPC
+- [X] Chat bubbles
+- [X] Transitioning between maps should put you in the right position
 - [X] NPCs should have some kind of basic AI - I mean they walk randomly
 - [X] Spawning of players and monsters should not be on an invalid tile
 - [X] Transfer player between maps (zones)
@@ -38,9 +38,15 @@ $ yarn start
 $ yarn dev
 ```
 
+## Map Editing
+
+All Maps are located in `./shared/maps` and can be opened using Tiled.
+
+After editing a `*.tmx` file you must export using Tiled as JSON to `./server/src/data/maps`
+
 ## Credits
 
 * Phaser 3 - https://github.com/photonstorm/phaser
 * Artwork from 'World of Solaria' - http://www.jamiebrownhill.com
 * Serialisation using FlatBuffers - https://github.com/google/flatbuffers
-
+* Tiled Map Editor - https://www.mapeditor.org
