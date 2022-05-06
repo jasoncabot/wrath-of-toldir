@@ -58,8 +58,8 @@ export const ChatArea = () => {
     }, []);
 
     return (
-        <div className="flex flex-1 flex-col px-3" style={{ 'maxHeight': '576px' }}>
-            <ol className='mt-3 flex-1 font-light text-xs overflow-y-scroll' ref={chatMessages}>
+        <div className="flex flex-1 flex-col pl-3" style={{ minHeight: '255px' }}>
+            <ol className='font-light flex-1 basis-0 text-xs overflow-y-scroll' ref={chatMessages}>
             </ol>
             <form className='flex items-center justify-between w-full' autoComplete='off' onSubmit={onSend}>
                 <input type="text"
@@ -70,7 +70,7 @@ export const ChatArea = () => {
                     onBlur={() => document.dispatchEvent(new CustomEvent('chat-dialog-blurred'))}
                     name="message" />
                 <button type="submit">
-                    <svg className="mt-3 w-5 h-5 origin-center transform rotate-90"
+                    <svg className="mt-3 mr-3 w-5 h-5 origin-center transform rotate-90"
                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path
                             d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />

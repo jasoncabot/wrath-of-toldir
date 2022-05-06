@@ -286,6 +286,13 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     if (pointer.isDown && isPointerInGameArea) {
       pointer.updateWorldPoint(this.scene.cameras.main);
 
+      if (pointer.wasTouch) {
+        // isPointerInGameArea doesn't work for touch events correctly as it is always true, so we instead
+        // look at the touch point, translated into our world point, which is a value between 0..x..width and 0..y..height
+        if (pointer.x < 0 || pointer.x > 576) return;
+        if (pointer.y < 0 || pointer.y > 576) return;
+      }
+      
       const angleToPointer = Phaser.Math.Angle.BetweenPoints({ x: pointer.worldX, y: pointer.worldY }, this.getCenter());
 
       let direction = Direction.RIGHT;

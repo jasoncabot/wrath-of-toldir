@@ -5,7 +5,7 @@ import { MainScene, PreloadScene } from '../scripts/scenes';
 import { PlayableCharacter } from './CharacterList';
 import { ChatArea } from './ChatArea';
 
-const config = {
+const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     backgroundColor: '#2e222f',
     parent: 'game-content',
@@ -30,7 +30,7 @@ const config = {
     },
     render: {
         pixelArt: true
-    }
+    },
 };
 
 const GameContainer = (props: { character: PlayableCharacter }) => {
