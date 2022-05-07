@@ -1,6 +1,4 @@
-## Wrath of Toldir
-
-An open-souce MMORPG
+This is the set of technical notes and architecture diagrams to help document how and why things are the way they are from a higher and more technical level
 
 ## Architecture
 
