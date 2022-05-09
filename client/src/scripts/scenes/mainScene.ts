@@ -1,5 +1,6 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Direction, GridEngine } from 'grid-engine';
+import { textures as heroTextures } from "../../assets/spritesheets/Sprites/Heroes";
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
 import { Action, JoinCommand, MoveCommand, Vec2 } from '../../models/commands';
@@ -19,11 +20,10 @@ import ChatDialog from '../objects/chatDialog';
 import Monster, { MonsterTexture } from '../objects/monster';
 import { WalkingAnimatable } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
+import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
 import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
 
-
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
-
 
 /**
  * The state of the user interface for this particular map
@@ -56,6 +56,7 @@ export default class MainScene extends Phaser.Scene {
   onPositionChangedSubscription: any;
   player: PlayerCharacter
   playerCharacters: PlayerCharacter[];
+  movementController: MovementController;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -66,17 +67,10 @@ export default class MainScene extends Phaser.Scene {
 
   preload() {
     Monster.preload(this, "slime1");
-    (['hero1',
-      'hero2',
-      'hero3',
-      'hero4',
-      'hero5',
-      'hero6',
-      'hero7',
-      'hero8',
-      'hero9',
-      'hero10']).forEach(hero => PlayerCharacter.preload(this, hero));
+    heroTextures.forEach(hero => PlayerCharacter.preload(this, hero));
     Weapon.preload(this);
+
+    this.plugins.installScenePlugin('PlayerMovementPlugin', PlayerMovementPlugin, 'joystick', this);
   }
 
   async create() {
@@ -90,6 +84,7 @@ export default class MainScene extends Phaser.Scene {
     }) as Phaser.Types.Input.Keyboard.CursorKeys;
 
     this.interfaceCamera = this.cameras.add();
+    this.input.addPointer(3); // support multitouch
 
     this.debugText = new DebugText(this).setVisible(false);
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
@@ -97,22 +92,32 @@ export default class MainScene extends Phaser.Scene {
 
     this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
 
+    this.movementController = this.add.joystick();
+    this.movementController.on(DefaultActionTriggered, this.applyDefaultAction);
+
     this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
       if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
         this.chatOverlay.focus();
       }
     });
-
     this.transitionToInitial(currentCharacterRegion());
   }
 
   update() {
     if (this.currentState !== MapSceneState.READY) return;
+    if (!this.movementController) return;
 
+    this.movementController.updateDirection(this.player, this.cursors);
     this.debugText.update();
-    this.player.applyMovement(this.gridEngine, this.cursors, this.input.activePointer, this.input.isOver);
 
-    if ((this.cursors.shift.isDown && this.input.activePointer.isDown && this.input.isOver) || this.cursors.space.isDown) {
+    if (this.cursors.shift.isDown) {
+      this.gridEngine.stopMovement(this.player.identifier);
+      this.gridEngine.turnTowards(this.player.identifier, this.movementController.direction);
+    } else {
+      this.gridEngine.move(this.player.identifier, this.movementController.direction);
+    }
+
+    if (this.cursors.space.isDown) {
       this.applyDefaultAction();
     }
 
@@ -120,13 +125,13 @@ export default class MainScene extends Phaser.Scene {
   }
 
   private onTextEntered(text: string) {
-    // TODO: parse text and send appropriate event to server 
-    // ChatEvent
-    // CommandEvent
+    // Parses text and send appropriate command to server 
+
     // * /g 1:1 = move to space (1, 1)
     if (text.length === 0) return;
     if (text.startsWith("/g")) {
       // just move us locally - this should tell the server we want to move
+      // TODO: this should likely be removed so you can't just warp wherever you'd like - or we could just handle it on the server
       const [x, y] = text.split(" ")[1].split(":");
       this.gridEngine.setPosition(this.player.identifier, { x: parseInt(x, 10), y: parseInt(y, 10) }, this.gridEngine.getCharLayer(this.player.identifier));
       return;
@@ -144,6 +149,7 @@ export default class MainScene extends Phaser.Scene {
       const update = Command.endCommand(builder);
       builder.finish(update);
       this.connection?.send(builder.asUint8Array());
+      return;
     }
   }
 
@@ -214,6 +220,8 @@ export default class MainScene extends Phaser.Scene {
   }
 
   applyDefaultAction() {
+    if (this.currentState !== MapSceneState.READY) return;
+
     // TODO: depending on what we have selected we might choose to do something different
     // than just plain attacking
     const lookingAtPosition = this.gridEngine.getFacingPosition(this.player.identifier);

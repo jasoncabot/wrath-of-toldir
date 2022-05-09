@@ -8,6 +8,8 @@ export default class DebugText extends Phaser.GameObjects.Text {
   }
 
   public update() {
-    this.setText(`${this.prefix} fps: ${Math.floor(this.scene.game.loop.actualFps)}`)
+    if (this.active && this.visible) {
+      this.setText(`${this.prefix} fps: ${Math.floor(this.scene.game.loop.actualFps)}`)
+    }
   }
 }

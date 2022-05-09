@@ -29,6 +29,7 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.spritesheet('slime1', 'assets/spritesheets/Sprites/Monsters/Slime 01 48.png', { frameWidth: 48, frameHeight: 48 });
 
     this.load.image('hud', 'assets/img/hud.png');
+    this.load.image('joystick-base', 'assets/img/joystick/base.png');
 
     this.load.addFile(new WebFontFile(this.load, 'Press Start 2P'));
   }

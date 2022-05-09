@@ -1,4 +1,4 @@
-import { CharacterData, Direction, GridEngine } from "grid-engine";
+import { CharacterData, Direction } from "grid-engine";
 import { MainScene } from "../scenes";
 import { WalkingAnimatable } from "./playerCharacter";
 

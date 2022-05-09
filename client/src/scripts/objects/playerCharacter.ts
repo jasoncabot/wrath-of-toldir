@@ -1,5 +1,6 @@
 import { CharacterData, Direction, GridEngine } from "grid-engine";
 import { HeroTexture } from "../../models/wrath-of-toldir/events/hero-texture";
+import { MovementController } from "../plugins/movementController";
 import { MainScene } from "../scenes";
 import Weapon from "./weapon";
 
@@ -246,66 +247,6 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
       repeat: -1,
       yoyo: true,
     });
-  }
-
-  applyMovement(gridEngine: GridEngine, cursors: Phaser.Types.Input.Keyboard.CursorKeys, pointer: Phaser.Input.Pointer, isPointerInGameArea: boolean): void {
-
-    const moveInDirection = (direction: Direction) => {
-      if (cursors.shift.isDown) {
-        gridEngine.stopMovement(this.identifier);
-        gridEngine.turnTowards(this.identifier, direction);
-      } else {
-        gridEngine.move(this.identifier, direction);
-      }
-    }
-
-    if (cursors.up.isDown && !cursors.down.isDown) {
-      if (cursors.left.isDown && !cursors.right.isDown) {
-        moveInDirection(Direction.UP_LEFT);
-      } else if (!cursors.left.isDown && cursors.right.isDown) {
-        moveInDirection(Direction.UP_RIGHT);
-      } else {
-        moveInDirection(Direction.UP);
-      }
-    } else if (!cursors.up.isDown && cursors.down.isDown) {
-      if (cursors.left.isDown && !cursors.right.isDown) {
-        moveInDirection(Direction.DOWN_LEFT);
-      } else if (!cursors.left.isDown && cursors.right.isDown) {
-        moveInDirection(Direction.DOWN_RIGHT);
-      } else {
-        moveInDirection(Direction.DOWN);
-      }
-    } else {
-      if (cursors.left.isDown && !cursors.right.isDown) {
-        moveInDirection(Direction.LEFT);
-      } else if (!cursors.left.isDown && cursors.right.isDown) {
-        moveInDirection(Direction.RIGHT);
-      }
-    }
-
-    if (pointer.isDown && isPointerInGameArea) {
-      pointer.updateWorldPoint(this.scene.cameras.main);
-
-      if (pointer.wasTouch) {
-        // isPointerInGameArea doesn't work for touch events correctly as it is always true, so we instead
-        // look at the touch point, translated into our world point, which is a value between 0..x..width and 0..y..height
-        if (pointer.x < 0 || pointer.x > 576) return;
-        if (pointer.y < 0 || pointer.y > 576) return;
-      }
-      
-      const angleToPointer = Phaser.Math.Angle.BetweenPoints({ x: pointer.worldX, y: pointer.worldY }, this.getCenter());
-
-      let direction = Direction.RIGHT;
-      if (angleToPointer >= -2.74889357189) direction = Direction.DOWN_RIGHT;
-      if (angleToPointer >= -1.96349540849) direction = Direction.DOWN;
-      if (angleToPointer >= -1.1780972451) direction = Direction.DOWN_LEFT;
-      if (angleToPointer >= -0.39269908169) direction = Direction.LEFT;
-      if (angleToPointer >= 0.39269908169) direction = Direction.UP_LEFT;
-      if (angleToPointer >= 1.1780972451) direction = Direction.UP;
-      if (angleToPointer >= 1.96349540849) direction = Direction.UP_RIGHT;
-
-      moveInDirection(direction);
-    }
   }
 }
 
