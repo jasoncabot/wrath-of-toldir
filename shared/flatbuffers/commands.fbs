@@ -1,5 +1,6 @@
 include "events.fbs";
 include "attacks.fbs";
+include "entities.fbs";
 
 namespace WrathOfToldir.Commands;
 
@@ -21,12 +22,18 @@ table ChatCommand {
     message: string;
 }
 
+table SpawnCommand {
+    type: WrathOfToldir.EntityTexture;
+    pos: Vec2;
+}
+
 union Action {
     MoveCommand,
     JoinCommand,
     LeaveCommand,
     AttackCommand,
-    ChatCommand
+    ChatCommand,
+    SpawnCommand
 }
 
 table Command {

@@ -1,8 +1,9 @@
 import { CharacterData, Direction } from "grid-engine";
+import { textureForEntity } from "../../assets/spritesheets/Sprites";
+import { EntityTexture } from "../../models/commands";
+import { Entity } from "../../models/events";
 import { MainScene } from "../scenes";
 import { WalkingAnimatable } from "./playerCharacter";
-
-export type MonsterTexture = 'slime1'
 
 export const normalisedFacingDirection = (direction: Direction) => {
     switch (direction) {
@@ -20,24 +21,25 @@ export const normalisedFacingDirection = (direction: Direction) => {
 
 export default class Monster extends Phaser.Physics.Arcade.Sprite implements WalkingAnimatable {
     identifier: string;
-    monsterTexture: MonsterTexture;
     gridEngineCharacterData: CharacterData;
     walkingState: "walk" | "stand" | "attack";
 
-    constructor(scene: MainScene, x: number, y: number, z: string, texture: MonsterTexture, identifier: string) {
-        super(scene, 0, 0, texture, 0);
-        this.identifier = identifier;
-        this.monsterTexture = texture;
+    constructor(scene: MainScene, name: string, entity: Entity) {
+        super(scene, 0, 0, textureForEntity(entity.texture()), 0);
+        this.identifier = entity.key().toString();
         this.gridEngineCharacterData = {
-            id: identifier,
+            id: this.identifier,
             sprite: this,
             speed: 2,
-            startPosition: { x, y },
+            startPosition: {
+                x: entity.pos()!.x(),
+                y: entity.pos()!.y()
+            },
             collides: {
                 collisionGroups: ["monster"],
             },
             facingDirection: Direction.DOWN,
-            charLayer: z
+            charLayer: entity.charLayer()!
         }
         this.walkingState = "stand";
 
@@ -57,7 +59,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
 
     playWalkAnimation(direction: Direction) {
         this.walkingState = "walk";
-        const anim = this.monsterTexture + "_walk_" + normalisedFacingDirection(direction);
+        const anim = this.texture.key + "_walk_" + normalisedFacingDirection(direction);
         return this.play(anim);
     }
 
@@ -66,107 +68,20 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
         this.anims.stop();
         this.setFrame(this.getStopFrame(direction));
 
-        const anim = this.monsterTexture + "_stand_" + normalisedFacingDirection(direction);
+        const anim = this.texture.key + "_stand_" + normalisedFacingDirection(direction);
         return this.play(anim);
     }
 
     playAttackAnimation(direction: Direction) {
         const oldState = this.walkingState;
         this.walkingState = "attack";
-        const anim = this.monsterTexture + "_attack_" + normalisedFacingDirection(direction);
+        const anim = this.texture.key + "_attack_" + normalisedFacingDirection(direction);
         return this.play(anim).on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
             if (oldState == "walk") {
                 this.playWalkAnimation(direction);
             } else {
                 this.playStandAnimation(direction);
             }
-        });
-    }
-
-    static preload = (scene: Phaser.Scene, texture: MonsterTexture) => {
-        const frameRate = {
-            attack: 16,
-            stand: 4,
-            walk: 6
-        };
-
-        // scene.anims.create({
-        //     key: texture + '_attack_' + Direction.DOWN,
-        //     frames: scene.anims.generateFrameNumbers(texture, { frames: [65, 67, 68, 70] }),
-        //     frameRate: rate
-        // });
-        // scene.anims.create({
-        //     key: texture + '_attack_' + Direction.UP,
-        //     frames: scene.anims.generateFrameNumbers(texture, { frames: [65, 67, 68, 70] }),
-        //     frameRate: rate
-        // });
-        // scene.anims.create({
-        //     key: texture + '_attack_' + Direction.RIGHT,
-        //     frames: scene.anims.generateFrameNumbers(texture, { frames: [65, 67, 68, 70] }),
-        //     frameRate: rate
-        // });
-        // scene.anims.create({
-        //     key: texture + '_attack_' + Direction.LEFT,
-        //     frames: scene.anims.generateFrameNumbers(texture, { frames: [65, 67, 68, 70] }),
-        //     frameRate: rate
-        // });
-
-        scene.anims.create({
-            key: texture + '_stand_' + Direction.DOWN,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [0, 1, 2, 3] }),
-            frameRate: frameRate.stand,
-            repeat: -1,
-            yoyo: true,
-        });
-        scene.anims.create({
-            key: texture + '_stand_' + Direction.UP,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [12, 13, 14, 15] }),
-            frameRate: frameRate.stand,
-            repeat: -1,
-            yoyo: true,
-        });
-        scene.anims.create({
-            key: texture + '_stand_' + Direction.RIGHT,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [8, 9, 10, 11] }),
-            frameRate: frameRate.stand,
-            repeat: -1,
-            yoyo: true,
-        });
-        scene.anims.create({
-            key: texture + '_stand_' + Direction.LEFT,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [4, 5, 6, 7] }),
-            frameRate: frameRate.stand,
-            repeat: -1,
-            yoyo: true,
-        });
-
-        scene.anims.create({
-            key: texture + '_walk_' + Direction.DOWN,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [16, 17, 18, 19] }),
-            frameRate: frameRate.walk,
-            repeat: -1,
-            yoyo: true,
-        });
-        scene.anims.create({
-            key: texture + '_walk_' + Direction.UP,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [28, 29, 30, 31] }),
-            frameRate: frameRate.walk,
-            repeat: -1,
-            yoyo: true,
-        });
-        scene.anims.create({
-            key: texture + '_walk_' + Direction.RIGHT,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [24, 25, 26, 27] }),
-            frameRate: frameRate.walk,
-            repeat: -1,
-            yoyo: true,
-        });
-        scene.anims.create({
-            key: texture + '_walk_' + Direction.LEFT,
-            frames: scene.anims.generateFrameNumbers(texture, { frames: [20, 21, 22, 23] }),
-            frameRate: frameRate.walk,
-            repeat: -1,
-            yoyo: true,
         });
     }
 }

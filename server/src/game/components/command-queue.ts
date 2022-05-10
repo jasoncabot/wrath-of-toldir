@@ -1,15 +1,15 @@
 import { AttackResult } from "@/durable-objects/combat";
 import { Connection } from "@/durable-objects/map";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
-import { Action, AttackCommand, AttackData, ChatCommand, JoinCommand, MoveCommand } from "@/models/commands";
-import { HeroTexture } from "@/models/events";
+import { Action, AttackCommand, AttackData, ChatCommand, EntityTexture, JoinCommand, MoveCommand, SpawnCommand } from "@/models/commands";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
-import { EntityId, MapTransition, NPC, PlayerId, ReceivedCommand, TiledJSON } from "../game";
-import { EventBuilder, PlayerJoinData } from "./event-builder";
+import { Entity, EntityId, MapTransition, PlayerId, ReceivedCommand, TiledJSON } from "../game";
+import { EventBuilder } from "./event-builder";
 import { Position, PositionKeeper } from "./position-keeper";
+import { v4 as uuidv4 } from 'uuid';
 
-export type CharacterDetailLookup = (playerId: PlayerId, characterId: PlayerId) => Promise<{ name: string, texture: HeroTexture }>;
+export type CharacterDetailLookup = (playerId: PlayerId, characterId: PlayerId) => Promise<{ name: string, texture: EntityTexture }>;
 
 export class CommandQueue {
     private connections: Record<PlayerId, Connection>;
@@ -17,11 +17,11 @@ export class CommandQueue {
     private map: TiledJSON;
     private positionKeeper: PositionKeeper;
     private eventBuilder: EventBuilder;
-    private npcs: Record<EntityId, NPC>;
+    private npcs: Record<EntityId, Entity>;
     private combat: DurableObjectNamespace;
 
     // TODO: This is horrid - still need to think about how to structure this and what it's responsibilities are
-    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, NPC>, combat: DurableObjectNamespace) {
+    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, combat: DurableObjectNamespace) {
         this.commands = [];
         this.map = map;
         this.positionKeeper = positionKeeper;
@@ -104,28 +104,26 @@ export class CommandQueue {
                     const character = this.connections[entityId].character;
 
                     // inform other players
-                    const playerData: PlayerJoinData = {
+                    const playerData: Entity = {
                         key: publicCharId,
-                        name: character.name,
                         position: this.positionKeeper.getEntityPosition(entityId),
                         texture: character.texture
                     };
-                    this.eventBuilder.pushCurrentMapState(entityId, playerData, this.map, this.npcs, this.positionKeeper);
+                    this.eventBuilder.pushCurrentMapState(entityId, character.name, playerData, this.map, this.npcs, this.positionKeeper);
                     this.positionKeeper.findJoinWitnesses(entityId, players, async otherPlayerId => {
                         // tell the player who joined about other players who are already here
                         const otherPublicCharacterId = this.connections[otherPlayerId].publicCharacterId;
                         const otherCharacter = this.connections[otherPlayerId].character;
                         if (otherPublicCharacterId) {
-                            const otherPlayerData: PlayerJoinData = {
+                            const otherPlayerData: Entity = {
                                 key: otherPublicCharacterId,
-                                name: otherCharacter.name,
                                 position: this.positionKeeper.getEntityPosition(otherPlayerId),
                                 texture: otherCharacter.texture
                             };
-                            this.eventBuilder.pushJoinEvent(entityId, otherPlayerData);
+                            this.eventBuilder.pushJoinEvent(entityId, otherCharacter.name, otherPlayerData);
                         }
 
-                        this.eventBuilder.pushJoinEvent(otherPlayerId, playerData);
+                        this.eventBuilder.pushJoinEvent(otherPlayerId, character.name, playerData);
                     });
                     break;
                 }
@@ -155,6 +153,7 @@ export class CommandQueue {
                     damages.forEach(attack => {
                         if (attack.state == DamageState.Dead) {
                             delete this.npcs[attack.targetId];
+                            // TODO: finish destroying this NPC
                             // increase experience
                             // drop loop
                         }
@@ -186,6 +185,33 @@ export class CommandQueue {
                     });
 
                     break;
+                }
+
+                case Action.SpawnCommand: {
+                    // read client action
+                    const spawn: SpawnCommand = command.action(new SpawnCommand());
+
+                    // update game state
+                    const npcId = uuidv4();
+                    const npcKey = Math.floor(Math.random() * 2147483647);
+                    const position = {
+                        x: spawn.pos()!.x(),
+                        y: spawn.pos()!.y(),
+                        z: 'charLevel1'
+                    };
+                    const entity = {
+                        key: npcKey,
+                        position: position,
+                        texture: spawn.type()
+                    };
+                    this.npcs[npcId] = entity;
+
+                    this.positionKeeper.spawnEntityAt(npcId, position);
+
+                    // inform other players
+                    players.forEach(otherPlayerId => {
+                        this.eventBuilder.pushJoinEvent(otherPlayerId, "", entity);
+                    });
                 }
             }
         }

@@ -1,17 +1,15 @@
 import { AttackData, MagicAttack, NormalAttack } from "@/models/attacks";
 import { AttackCommand } from "@/models/commands";
-import { AttackEvent, DamagedEvent, HeroTexture, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
+import { AttackEvent, DamagedEvent, Entity as EntityEvent, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
 import { MapLayer, TileCollision, TileSet } from "@/models/maps";
 import { ChatEvent } from "@/models/wrath-of-toldir/events/chat-event";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
-import { Npc } from "@/models/wrath-of-toldir/npcs/npc";
 import { Builder } from "flatbuffers";
-import { EntityId, NPC, PlayerId, TiledJSON } from "../game";
+import { EntityId, Entity, PlayerId, TiledJSON } from "../game";
 import { Position, PositionKeeper } from "./position-keeper";
 
 type Effects = { builder: Builder, eventOffsets: number[], eventTypeOffsets: number[] };
-export type PlayerJoinData = { key: number, name: string, texture: HeroTexture, position: Position };
 
 export class EventBuilder {
     private tickEvents: Record<PlayerId, Effects>;
@@ -68,22 +66,27 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.MoveEvent);
     }
 
-    pushJoinEvent(playerId: PlayerId, other: PlayerJoinData) {
+    pushJoinEvent(playerId: PlayerId, name: string, other: Entity) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
-        const otherPlayerName = builder.createString(other.name);
+        const otherPlayerName = builder.createString(name);
         const charLayerOffset = builder.createString(other.position.z);
+
+        EntityEvent.startEntity(builder);
+        EntityEvent.addCharLayer(builder, charLayerOffset);
+        EntityEvent.addKey(builder, other.key);
+        EntityEvent.addPos(builder, Vec2.createVec2(builder, other.position.x, other.position.y));
+        EntityEvent.addTexture(builder, other.texture);
+        const entityOffset = EntityEvent.endEntity(builder);
+
         JoinEvent.startJoinEvent(builder);
-        JoinEvent.addKey(builder, other.key);
-        JoinEvent.addPos(builder, Vec2.createVec2(builder, other.position.x, other.position.y));
         JoinEvent.addName(builder, otherPlayerName);
-        JoinEvent.addCharLayer(builder, charLayerOffset);
-        JoinEvent.addTexture(builder, other.texture);
+        JoinEvent.addEntity(builder, entityOffset);
         eventOffsets.push(JoinEvent.endJoinEvent(builder));
         eventTypeOffsets.push(Update.JoinEvent);
     }
 
-    pushCurrentMapState(playerId: PlayerId, playerData: PlayerJoinData, mapData: TiledJSON, npcs: Record<EntityId, NPC>, positionKeeper: PositionKeeper) {
+    pushCurrentMapState(playerId: PlayerId, playerName: string, playerData: Entity, mapData: TiledJSON, npcs: Record<EntityId, Entity>, positionKeeper: PositionKeeper) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         // TODO: can we load the (static) map data earlier and just merge the byte buffer here
@@ -108,30 +111,33 @@ export class EventBuilder {
         const npcOffsets = Object.keys(npcs).map(npcId => {
             const npc = npcs[npcId];
             const pos = positionKeeper.getEntityPosition(npcId);
-            const textureOffset = builder.createString(npc.type);
             const charLayerOffset = builder.createString(pos.z);
-            Npc.startNpc(builder);
-            Npc.addKey(builder, npc.key);
-            Npc.addTexture(builder, textureOffset);
-            Npc.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y))
-            Npc.addCharLayer(builder, charLayerOffset);
-            return Npc.endNpc(builder);
+
+            EntityEvent.startEntity(builder);
+            EntityEvent.addCharLayer(builder, charLayerOffset);
+            EntityEvent.addKey(builder, npc.key);
+            EntityEvent.addPos(builder, Vec2.createVec2(builder, npc.position.x, npc.position.y));
+            EntityEvent.addTexture(builder, npc.texture);
+            return EntityEvent.endEntity(builder);
         })
-        const npcsVector = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
+        const npcsVectorOffset = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
 
-        const nameOffset = builder.createString(playerData.name);
         const charLayerOffset = builder.createString(playerData.position.z);
-        MapJoinedEvent.startMapJoinedEvent(builder);
-        MapJoinedEvent.addKey(builder, playerData.key);
-        MapJoinedEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
-        MapJoinedEvent.addName(builder, nameOffset);
-        MapJoinedEvent.addCharLayer(builder, charLayerOffset);
-        MapJoinedEvent.addTexture(builder, playerData.texture);
-        MapJoinedEvent.addTilemap(builder, tilemapOffset);
-        MapJoinedEvent.addNpcs(builder, npcsVector);
-        const eventOffset = MapJoinedEvent.endMapJoinedEvent(builder);
+        EntityEvent.startEntity(builder);
+        EntityEvent.addCharLayer(builder, charLayerOffset);
+        EntityEvent.addKey(builder, playerData.key);
+        EntityEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
+        EntityEvent.addTexture(builder, playerData.texture);
+        const playerOffset = EntityEvent.endEntity(builder);
 
-        eventOffsets.push(eventOffset);
+        const nameOffset = builder.createString(playerName);
+        MapJoinedEvent.startMapJoinedEvent(builder);
+        MapJoinedEvent.addName(builder, nameOffset);
+        MapJoinedEvent.addNpcs(builder, npcsVectorOffset);
+        MapJoinedEvent.addPlayer(builder, playerOffset);
+        MapJoinedEvent.addTilemap(builder, tilemapOffset);
+
+        eventOffsets.push(MapJoinedEvent.endMapJoinedEvent(builder));
         eventTypeOffsets.push(Update.MapJoinedEvent);
     }
 

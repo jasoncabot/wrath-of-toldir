@@ -1,3 +1,4 @@
+import { EntityTexture } from "../../models/commands";
 import { authToken } from "./auth";
 
 export const fetchCharacters = () => {
@@ -6,7 +7,7 @@ export const fetchCharacters = () => {
         .then(resp => resp.json());
 }
 
-export const createCharacter = (character: { name: string, texture: string }) => {
+export const createCharacter = (character: { name: string, texture: EntityTexture }) => {
     const apiURI = `${process.env.API_URI}/api/characters`;
     return fetch(apiURI, {
         method: 'POST',

@@ -1,22 +1,9 @@
 include "maps.fbs";
 include "maps.fbs";
-include "npcs.fbs";
+include "entities.fbs";
 include "attacks.fbs";
 
 namespace WrathOfToldir.Events;
-
-enum HeroTexture : byte {
-    Hero1,
-    Hero2,
-    Hero3,
-    Hero4,
-    Hero5,
-    Hero6,
-    Hero7,
-    Hero8,
-    Hero9,
-    Hero10
-}
 
 table MoveEvent {
     key: uint32;
@@ -25,11 +12,8 @@ table MoveEvent {
 }
 
 table JoinEvent {
-    key: uint32;
-    pos: Vec2;
     name: string;
-    char_layer: string;
-    texture: HeroTexture;
+    entity: WrathOfToldir.Entity;
 }
 
 table LeaveEvent {
@@ -55,13 +39,10 @@ table DamagedEvent {
 }
 
 table MapJoinedEvent {
-    key: uint32;
-    pos: Vec2;
     name: string;
-    char_layer: string;
-    texture: HeroTexture;
+    player: WrathOfToldir.Entity;
     tilemap: WrathOfToldir.Maps.TileMap;
-    npcs: [WrathOfToldir.Npcs.Npc];
+    npcs: [WrathOfToldir.Entity];
 }
 
 table MapChangedEvent {

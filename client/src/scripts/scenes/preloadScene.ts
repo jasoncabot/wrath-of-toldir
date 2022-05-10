@@ -1,5 +1,5 @@
 import WebFontFile from "../objects/WebFontFile";
-import { textureImages, textures } from './../../assets/spritesheets/Sprites/Heroes/';
+import { textureMap } from './../../assets/spritesheets/Sprites/';
 
 export default class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -20,13 +20,10 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.spritesheet('windows', 'assets/spritesheets/Tilesets/Rural Village Doors Windows48.png', { frameWidth: 48, frameHeight: 48 });
     this.load.spritesheet('collisions', 'assets/spritesheets/Tilesets/Collisions.png', { frameWidth: 48, frameHeight: 48 });
 
-    for (let index = 0; index < textures.length; index++) {
-      const key = textures[index];
-      const value = textureImages[index];
-      this.load.spritesheet(key, value, { frameWidth: 48, frameHeight: 48 });
+    for (let [key, value] of textureMap) {
+      this.load.spritesheet(key, value.path, { frameWidth: value.width, frameHeight: value.height });
     }
     this.load.spritesheet('sword', 'assets/spritesheets/Sprites/Weapons/sword-01.png', { frameWidth: 144, frameHeight: 144 });
-    this.load.spritesheet('slime1', 'assets/spritesheets/Sprites/Monsters/Slime 01 48.png', { frameWidth: 48, frameHeight: 48 });
 
     this.load.image('hud', 'assets/img/hud.png');
     this.load.image('joystick-base', 'assets/img/joystick/base.png');

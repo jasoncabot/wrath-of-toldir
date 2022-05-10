@@ -5,6 +5,7 @@ import { ChatCommand } from '../../wrath-of-toldir/commands/chat-command';
 import { JoinCommand } from '../../wrath-of-toldir/commands/join-command';
 import { LeaveCommand } from '../../wrath-of-toldir/commands/leave-command';
 import { MoveCommand } from '../../wrath-of-toldir/commands/move-command';
+import { SpawnCommand } from '../../wrath-of-toldir/commands/spawn-command';
 
 
 export enum Action{
@@ -13,13 +14,14 @@ export enum Action{
   JoinCommand = 2,
   LeaveCommand = 3,
   AttackCommand = 4,
-  ChatCommand = 5
+  ChatCommand = 5,
+  SpawnCommand = 6
 }
 
 export function unionToAction(
   type: Action,
-  accessor: (obj:AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand) => AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|null
-): AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|null {
+  accessor: (obj:AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|SpawnCommand) => AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|SpawnCommand|null
+): AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|SpawnCommand|null {
   switch(Action[type]) {
     case 'NONE': return null; 
     case 'MoveCommand': return accessor(new MoveCommand())! as MoveCommand;
@@ -27,15 +29,16 @@ export function unionToAction(
     case 'LeaveCommand': return accessor(new LeaveCommand())! as LeaveCommand;
     case 'AttackCommand': return accessor(new AttackCommand())! as AttackCommand;
     case 'ChatCommand': return accessor(new ChatCommand())! as ChatCommand;
+    case 'SpawnCommand': return accessor(new SpawnCommand())! as SpawnCommand;
     default: return null;
   }
 }
 
 export function unionListToAction(
   type: Action, 
-  accessor: (index: number, obj:AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand) => AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|null, 
+  accessor: (index: number, obj:AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|SpawnCommand) => AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|SpawnCommand|null, 
   index: number
-): AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|null {
+): AttackCommand|ChatCommand|JoinCommand|LeaveCommand|MoveCommand|SpawnCommand|null {
   switch(Action[type]) {
     case 'NONE': return null; 
     case 'MoveCommand': return accessor(index, new MoveCommand())! as MoveCommand;
@@ -43,6 +46,7 @@ export function unionListToAction(
     case 'LeaveCommand': return accessor(index, new LeaveCommand())! as LeaveCommand;
     case 'AttackCommand': return accessor(index, new AttackCommand())! as AttackCommand;
     case 'ChatCommand': return accessor(index, new ChatCommand())! as ChatCommand;
+    case 'SpawnCommand': return accessor(index, new SpawnCommand())! as SpawnCommand;
     default: return null;
   }
 }

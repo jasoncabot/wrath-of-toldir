@@ -1,9 +1,9 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Direction, GridEngine } from 'grid-engine';
-import { textures as heroTextures } from "../../assets/spritesheets/Sprites/Heroes";
+import { AnimatedSpriteDirectionalFrames, entityTextureNames, textureMap } from "../../assets/spritesheets/Sprites";
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
-import { Action, JoinCommand, MoveCommand, Vec2 } from '../../models/commands';
+import { Action, EntityTexture, JoinCommand, MoveCommand, SpawnCommand, Vec2 } from '../../models/commands';
 import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
@@ -17,7 +17,7 @@ import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-e
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
 import ChatDialog from '../objects/chatDialog';
-import Monster, { MonsterTexture } from '../objects/monster';
+import Monster from '../objects/monster';
 import { WalkingAnimatable } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
 import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
@@ -66,8 +66,28 @@ export default class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    Monster.preload(this, "slime1");
-    heroTextures.forEach(hero => PlayerCharacter.preload(this, hero));
+    // TODO: we don't have to preload every single sprite in existence, just the ones that are likely to come up
+    for (let [sprite, config] of textureMap) {
+      [
+        { type: 'attack', rate: 16, repeat: false },
+        { type: 'stand', rate: 4, repeat: true },
+        { type: 'walk', rate: 6, repeat: true }
+      ].forEach(frame => {
+        ['up', 'down', 'left', 'right'].forEach(direction => {
+          const directional: AnimatedSpriteDirectionalFrames = config[frame.type];
+          const animation = {
+            key: `${sprite}_${frame.type}_${direction}`,
+            frames: this.anims.generateFrameNumbers(sprite, { frames: directional[direction] }),
+            frameRate: frame.rate
+          }
+          if (frame.repeat) {
+            animation['repeat'] = -1;
+            animation['yoyo'] = true;
+          }
+          this.anims.create(animation);
+        });
+      });
+    }
     Weapon.preload(this);
 
     this.plugins.installScenePlugin('PlayerMovementPlugin', PlayerMovementPlugin, 'joystick', this);
@@ -93,7 +113,11 @@ export default class MainScene extends Phaser.Scene {
     this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
 
     this.movementController = this.add.joystick();
-    this.movementController.on(DefaultActionTriggered, this.applyDefaultAction);
+    this.movementController.on(DefaultActionTriggered, () => {
+      setTimeout(() => {
+        this.applyDefaultAction();
+      }, 0);
+    });
 
     this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
       if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
@@ -137,6 +161,31 @@ export default class MainScene extends Phaser.Scene {
       return;
     } else if (text.startsWith("/debug")) {
       this.debugText.visible = !this.debugText.visible;
+      return;
+    } else if (text.startsWith("/spawn")) {
+      // /spawn 1:1 babySlime1
+      const parts = text.split(" ");
+      const [x, y] = parts[1].split(":");
+      const texture = parts[2];
+
+      const type = entityTextureNames.indexOf(texture);
+      if (type < 0) {
+        console.error(`Unable to spawn, type not found`);
+        return;
+      }
+
+      let builder = new Builder(16);
+      SpawnCommand.startSpawnCommand(builder);
+      SpawnCommand.addPos(builder, Vec2.createVec2(builder, parseInt(x, 10), parseInt(y, 10)));
+      SpawnCommand.addType(builder, type);
+      const spawn = SpawnCommand.endSpawnCommand(builder);
+      Command.startCommand(builder);
+      Command.addSeq(builder, ++this.commandSequencer);
+      Command.addActionType(builder, Action.SpawnCommand);
+      Command.addAction(builder, spawn);
+      const update = Command.endCommand(builder);
+      builder.finish(update);
+      this.connection?.send(builder.asUint8Array());
       return;
     } else {
       let builder = new Builder(text.length);
@@ -255,9 +304,9 @@ export default class MainScene extends Phaser.Scene {
         case Update.JoinEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
-          const pc = new PlayerCharacter(this, join.pos()!.x(), join.pos()!.y(), join.charLayer()!, join.texture(), join.name()!, join.key().toString());
+          const pc = new PlayerCharacter(this, join.name()!, join.entity()!);
           this.gridEngine.addCharacter(pc.gridEngineCharacterData);
-          pc.playStandAnimation(this.gridEngine.getFacingDirection(join.key().toString()));
+          pc.playStandAnimation(this.gridEngine.getFacingDirection(join.entity()!.key().toString()));
           this.playerCharacters.push(pc);
           break;
         }
@@ -449,8 +498,8 @@ export default class MainScene extends Phaser.Scene {
       this.interfaceCamera.ignore(tileDisplayLayer);
     }
 
-    this.debugText.prefix = this.debugText.prefix = `(${event.pos()!.x()},${event.pos()!.y()})`;
-    this.player = new PlayerCharacter(this, event.pos()!.x(), event.pos()!.y(), event.charLayer()!, event.texture(), event.name()!, event.key().toString());
+    this.debugText.prefix = `(${event.player()!.pos()!.x()},${event.player()!.pos()!.y()})`;
+    this.player = new PlayerCharacter(this, event.name()!, event.player()!);
     this.playerCharacters.push(this.player);
 
     this.cameras.main.startFollow(this.player, true);
@@ -465,7 +514,8 @@ export default class MainScene extends Phaser.Scene {
 
     for (let i = 0; i < event.npcsLength(); i++) {
       const npc = event.npcs(i)!;
-      const sprite = new Monster(this, npc.pos()!.x(), npc.pos()!.y(), npc.charLayer()!, npc.texture()! as MonsterTexture, npc.key().toString());
+      const enntityName = ""; // TODO: generate a funny name?
+      const sprite = new Monster(this, enntityName, npc);
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
     }

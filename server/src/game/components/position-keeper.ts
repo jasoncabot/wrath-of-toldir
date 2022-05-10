@@ -1,4 +1,5 @@
 import { durableObjectActionMap } from "@/handlers/maps"
+import { Vec2 } from "@/models/commands"
 import { EntityId, MapTransition, PlayerId, TiledJSON } from "../game"
 
 export type Elevation = string
@@ -121,7 +122,8 @@ export class PositionKeeper {
         if (!this.map) throw new Error(`Unable to spawn entity with id ${entityId} when map is undefined. Ensure map data has loaded.`);
         let spawnPosition: Position | undefined = await this.storage.get(storageKey(entityId));
 
-        while (!spawnPosition) {
+        let retries = 5;
+        while (!spawnPosition && retries > 0) {
             spawnPosition = {
                 x: Math.floor(Math.random() * this.map.width),
                 y: Math.floor(Math.random() * this.map.height),
@@ -130,9 +132,20 @@ export class PositionKeeper {
             if (this.isBlocked(spawnPosition)) {
                 spawnPosition = undefined;
             }
+            retries--;
+        }
+
+        if (!spawnPosition) {
+            throw new Error("Failed to generate spawn position for entity with id " + entityId);
         }
 
         this.setEntityPosition(entityId, spawnPosition);
+    }
+
+    spawnEntityAt(entityId: EntityId, position: Position) {
+        if (!this.map) throw new Error(`Unable to spawn entity with id ${entityId} when map is undefined. Ensure map data has loaded.`);
+
+        this.setEntityPosition(entityId, position);
     }
 
     getEntitiesAtPosition(position: Position, ignoringElevation = false) {

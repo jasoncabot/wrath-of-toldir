@@ -1,3 +1,4 @@
+import { EntityTexture } from "@/models/commands"
 import { Command } from "@/models/wrath-of-toldir/commands/command"
 import { Position } from "./components/position-keeper"
 
@@ -47,7 +48,8 @@ export interface TiledJSON {
     tilesets: MapTileSet[]
 }
 
-export interface NPC {
+export interface Entity {
     key: number
-    type: string
+    texture: EntityTexture
+    position: Position
 }

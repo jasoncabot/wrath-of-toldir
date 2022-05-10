@@ -105,7 +105,7 @@ export class MovementController extends Phaser.GameObjects.Image {
 
         pointer.updateWorldPoint(this.scene.cameras.main);
 
-        this.direction = this.directionBetween(player, { x: pointer.worldX, y: pointer.worldY });
+        this.direction = this.directionBetween(player.getCenter(), { x: pointer.worldX, y: pointer.worldY });
 
         if (cursors.shift.isDown) {
             this.emit(DefaultActionTriggered);

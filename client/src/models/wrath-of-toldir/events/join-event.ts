@@ -2,8 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { HeroTexture } from '../../wrath-of-toldir/events/hero-texture';
-import { Vec2 } from '../../wrath-of-toldir/vec2';
+import { Entity } from '../../wrath-of-toldir/entity';
 
 
 export class JoinEvent {
@@ -24,57 +23,28 @@ static getSizePrefixedRootAsJoinEvent(bb:flatbuffers.ByteBuffer, obj?:JoinEvent)
   return (obj || new JoinEvent()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-key():number {
-  const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
-}
-
-pos(obj?:Vec2):Vec2|null {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? (obj || new Vec2()).__init(this.bb_pos + offset, this.bb!) : null;
-}
-
 name():string|null
 name(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 name(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-charLayer():string|null
-charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-charLayer(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
-}
-
-texture():HeroTexture {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readInt8(this.bb_pos + offset) : HeroTexture.Hero1;
+entity(obj?:Entity):Entity|null {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? (obj || new Entity()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 static startJoinEvent(builder:flatbuffers.Builder) {
-  builder.startObject(5);
-}
-
-static addKey(builder:flatbuffers.Builder, key:number) {
-  builder.addFieldInt32(0, key, 0);
-}
-
-static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(1, posOffset, 0);
+  builder.startObject(2);
 }
 
 static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, nameOffset, 0);
+  builder.addFieldOffset(0, nameOffset, 0);
 }
 
-static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, charLayerOffset, 0);
-}
-
-static addTexture(builder:flatbuffers.Builder, texture:HeroTexture) {
-  builder.addFieldInt8(4, texture, HeroTexture.Hero1);
+static addEntity(builder:flatbuffers.Builder, entityOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, entityOffset, 0);
 }
 
 static endJoinEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

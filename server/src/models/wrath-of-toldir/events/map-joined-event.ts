@@ -2,10 +2,8 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { HeroTexture } from '../../wrath-of-toldir/events/hero-texture';
+import { Entity } from '../../wrath-of-toldir/entity';
 import { TileMap } from '../../wrath-of-toldir/maps/tile-map';
-import { Npc } from '../../wrath-of-toldir/npcs/npc';
-import { Vec2 } from '../../wrath-of-toldir/vec2';
 
 
 export class MapJoinedEvent {
@@ -26,80 +24,51 @@ static getSizePrefixedRootAsMapJoinedEvent(bb:flatbuffers.ByteBuffer, obj?:MapJo
   return (obj || new MapJoinedEvent()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-key():number {
-  const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
-}
-
-pos(obj?:Vec2):Vec2|null {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? (obj || new Vec2()).__init(this.bb_pos + offset, this.bb!) : null;
-}
-
 name():string|null
 name(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 name(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-charLayer():string|null
-charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-charLayer(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
-}
-
-texture():HeroTexture {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readInt8(this.bb_pos + offset) : HeroTexture.Hero1;
+player(obj?:Entity):Entity|null {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? (obj || new Entity()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 tilemap(obj?:TileMap):TileMap|null {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
+  const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? (obj || new TileMap()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
-npcs(index: number, obj?:Npc):Npc|null {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
-  return offset ? (obj || new Npc()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+npcs(index: number, obj?:Entity):Entity|null {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? (obj || new Entity()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
 }
 
 npcsLength():number {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
 static startMapJoinedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(7);
-}
-
-static addKey(builder:flatbuffers.Builder, key:number) {
-  builder.addFieldInt32(0, key, 0);
-}
-
-static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(1, posOffset, 0);
+  builder.startObject(4);
 }
 
 static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, nameOffset, 0);
+  builder.addFieldOffset(0, nameOffset, 0);
 }
 
-static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, charLayerOffset, 0);
-}
-
-static addTexture(builder:flatbuffers.Builder, texture:HeroTexture) {
-  builder.addFieldInt8(4, texture, HeroTexture.Hero1);
+static addPlayer(builder:flatbuffers.Builder, playerOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, playerOffset, 0);
 }
 
 static addTilemap(builder:flatbuffers.Builder, tilemapOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(5, tilemapOffset, 0);
+  builder.addFieldOffset(2, tilemapOffset, 0);
 }
 
 static addNpcs(builder:flatbuffers.Builder, npcsOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(6, npcsOffset, 0);
+  builder.addFieldOffset(3, npcsOffset, 0);
 }
 
 static createNpcsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {

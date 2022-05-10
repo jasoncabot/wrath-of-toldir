@@ -1,18 +1,17 @@
-import { asHeroTexture } from '@/data/characters';
-import { HeroTexture } from '@/models/events';
+import { EntityTexture } from '@/models/commands';
 import { v4 as uuidv4 } from 'uuid';
 
 export type CharacterAction = 'list' | 'create' | 'show' | 'setRegion';
 
 export interface CreateRequest {
     name: string
-    texture: string
+    texture: EntityTexture
 }
 
 export interface PlayableCharacter {
     id: string
     name: string
-    texture: HeroTexture
+    texture: EntityTexture
     region: string
 }
 
@@ -54,7 +53,7 @@ export class Character implements DurableObject {
                     const playableCharacter = {
                         id,
                         name: char.name,
-                        texture: asHeroTexture(char.texture),
+                        texture: char.texture,
                         region: this.startingRegion(char)
                     } as PlayableCharacter;
 
@@ -117,7 +116,17 @@ export class Character implements DurableObject {
         if (!character.name) return false;
         if (character.name.length < 2) return false;
         if (character.name.length > 30) return false;
-        if (asHeroTexture(character.texture) === undefined) return false;
+        if ([EntityTexture.Hero1
+            , EntityTexture.Hero2
+            , EntityTexture.Hero3
+            , EntityTexture.Hero4
+            , EntityTexture.Hero5
+            , EntityTexture.Hero6
+            , EntityTexture.Hero7
+            , EntityTexture.Hero8
+            , EntityTexture.Hero9
+            , EntityTexture.Hero10
+        ].indexOf(character.texture) < 0) return false;
         const all = await this.state.storage.list<PlayableCharacter>({ limit: MAX_CHAR_COUNT });
         if (Object.keys(all).length === MAX_CHAR_COUNT) return false;
         return true;

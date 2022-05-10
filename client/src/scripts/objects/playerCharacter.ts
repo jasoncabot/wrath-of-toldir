@@ -1,6 +1,6 @@
-import { CharacterData, Direction, GridEngine } from "grid-engine";
-import { HeroTexture } from "../../models/wrath-of-toldir/events/hero-texture";
-import { MovementController } from "../plugins/movementController";
+import { CharacterData, Direction } from "grid-engine";
+import { textureForEntity } from "../../assets/spritesheets/Sprites";
+import { Entity } from "../../models/events";
 import { MainScene } from "../scenes";
 import Weapon from "./weapon";
 
@@ -25,21 +25,6 @@ export const normalisedFacingDirection = (direction: Direction) => {
   }
 }
 
-const asSpriteTexture = (texture: HeroTexture) => {
-  switch (texture) {
-    case HeroTexture.Hero1: return 'hero1';
-    case HeroTexture.Hero2: return 'hero2';
-    case HeroTexture.Hero3: return 'hero3';
-    case HeroTexture.Hero4: return 'hero4';
-    case HeroTexture.Hero5: return 'hero5';
-    case HeroTexture.Hero6: return 'hero6';
-    case HeroTexture.Hero7: return 'hero7';
-    case HeroTexture.Hero8: return 'hero8';
-    case HeroTexture.Hero9: return 'hero9';
-    case HeroTexture.Hero10: return 'hero10';
-  }
-}
-
 export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implements WalkingAnimatable {
   identifier: string;
   gridEngineCharacterData: CharacterData;
@@ -49,20 +34,23 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   speechBubble: Phaser.GameObjects.Text;
   walkingState: "walk" | "stand" | "attack";
 
-  constructor(scene: MainScene, x: number, y: number, z: string, texture: HeroTexture, name: string, identifier: string) {
-    super(scene, 0, 0, asSpriteTexture(texture), 0);
-    this.identifier = identifier;
+  constructor(scene: MainScene, name: string, entity: Entity) {
+    super(scene, 0, 0, textureForEntity(entity.texture()), 0);
+    this.identifier = entity.key().toString();
     this.name = name;
     this.gridEngineCharacterData = {
-      id: identifier,
+      id: this.identifier,
       sprite: this,
       speed: 2,
-      startPosition: { x, y },
+      startPosition: {
+        x: entity.pos()!.x(),
+        y: entity.pos()!.y()
+      },
       collides: {
         collisionGroups: []
       },
       facingDirection: Direction.DOWN,
-      charLayer: z
+      charLayer: entity.charLayer()!
     }
     this.canAttack = true;
     this.walkingState = "stand";
@@ -160,93 +148,6 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     this.nameBadge?.destroy(fromScene);
     this.speechBubble?.destroy(fromScene);
     super.destroy(fromScene);
-  }
-
-  static preload = (scene: Phaser.Scene, texture: string) => {
-    const frameRate = {
-      attack: 16,
-      stand: 4,
-      walk: 6
-    };
-
-    scene.anims.create({
-      key: texture + '_attack_' + Direction.DOWN,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [65, 67, 68, 70] }),
-      frameRate: frameRate.attack
-    });
-    scene.anims.create({
-      key: texture + '_attack_' + Direction.UP,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [88, 90, 93, 95] }),
-      frameRate: frameRate.attack
-    });
-    scene.anims.create({
-      key: texture + '_attack_' + Direction.RIGHT,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [96, 98, 108, 110] }),
-      frameRate: frameRate.attack
-    });
-    scene.anims.create({
-      key: texture + '_attack_' + Direction.LEFT,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [121, 123, 117, 119] }),
-      frameRate: frameRate.attack
-    });
-
-    scene.anims.create({
-      key: texture + '_stand_' + Direction.DOWN,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [0, 1, 2, 3] }),
-      frameRate: frameRate.stand,
-      repeat: -1,
-      yoyo: true,
-    });
-    scene.anims.create({
-      key: texture + '_stand_' + Direction.LEFT,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [8, 9, 10, 11] }),
-      frameRate: frameRate.stand,
-      repeat: -1,
-      yoyo: true,
-    });
-    scene.anims.create({
-      key: texture + '_stand_' + Direction.RIGHT,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [16, 17, 18, 19] }),
-      frameRate: frameRate.stand,
-      repeat: -1,
-      yoyo: true,
-    });
-    scene.anims.create({
-      key: texture + '_stand_' + Direction.UP,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [24, 25, 26, 27] }),
-      frameRate: frameRate.stand,
-      repeat: -1,
-      yoyo: true,
-    });
-
-    scene.anims.create({
-      key: texture + '_walk_' + Direction.DOWN,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [32, 33, 34, 35] }),
-      frameRate: frameRate.walk,
-      repeat: -1,
-      yoyo: true,
-    });
-    scene.anims.create({
-      key: texture + '_walk_' + Direction.UP,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [56, 57, 58, 59] }),
-      frameRate: frameRate.walk,
-      repeat: -1,
-      yoyo: true,
-    });
-    scene.anims.create({
-      key: texture + '_walk_' + Direction.RIGHT,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [48, 49, 50, 51] }),
-      frameRate: frameRate.walk,
-      repeat: -1,
-      yoyo: true,
-    });
-    scene.anims.create({
-      key: texture + '_walk_' + Direction.LEFT,
-      frames: scene.anims.generateFrameNumbers(texture, { frames: [40, 41, 42, 43] }),
-      frameRate: frameRate.walk,
-      repeat: -1,
-      yoyo: true,
-    });
   }
 }
 

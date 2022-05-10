@@ -2,25 +2,26 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { Vec2 } from '../../wrath-of-toldir/vec2';
+import { EntityTexture } from '../wrath-of-toldir/entity-texture';
+import { Vec2 } from '../wrath-of-toldir/vec2';
 
 
-export class Npc {
+export class Entity {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
-__init(i:number, bb:flatbuffers.ByteBuffer):Npc {
+__init(i:number, bb:flatbuffers.ByteBuffer):Entity {
   this.bb_pos = i;
   this.bb = bb;
   return this;
 }
 
-static getRootAsNpc(bb:flatbuffers.ByteBuffer, obj?:Npc):Npc {
-  return (obj || new Npc()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+static getRootAsEntity(bb:flatbuffers.ByteBuffer, obj?:Entity):Entity {
+  return (obj || new Entity()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-static getSizePrefixedRootAsNpc(bb:flatbuffers.ByteBuffer, obj?:Npc):Npc {
+static getSizePrefixedRootAsEntity(bb:flatbuffers.ByteBuffer, obj?:Entity):Entity {
   bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
-  return (obj || new Npc()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+  return (obj || new Entity()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
 key():number {
@@ -28,11 +29,9 @@ key():number {
   return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
 }
 
-texture():string|null
-texture(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-texture(optionalEncoding?:any):string|Uint8Array|null {
+texture():EntityTexture {
   const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : EntityTexture.BabySlime1;
 }
 
 pos(obj?:Vec2):Vec2|null {
@@ -47,7 +46,7 @@ charLayer(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-static startNpc(builder:flatbuffers.Builder) {
+static startEntity(builder:flatbuffers.Builder) {
   builder.startObject(4);
 }
 
@@ -55,8 +54,8 @@ static addKey(builder:flatbuffers.Builder, key:number) {
   builder.addFieldInt32(0, key, 0);
 }
 
-static addTexture(builder:flatbuffers.Builder, textureOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, textureOffset, 0);
+static addTexture(builder:flatbuffers.Builder, texture:EntityTexture) {
+  builder.addFieldInt8(1, texture, EntityTexture.BabySlime1);
 }
 
 static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
@@ -67,7 +66,7 @@ static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Off
   builder.addFieldOffset(3, charLayerOffset, 0);
 }
 
-static endNpc(builder:flatbuffers.Builder):flatbuffers.Offset {
+static endEntity(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
