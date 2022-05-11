@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { PlayableCharacter } from '../../components/CharacterList';
 
-const storage = window.sessionStorage;
+const storage = window.localStorage;
 
 export const authToken = () => {
     let token = storage.getItem('token');
