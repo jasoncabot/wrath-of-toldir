@@ -26,7 +26,7 @@ export class ArtificialIntelligence {
             const { key } = this.npcs[npcId];
             const oldPos = this.positionKeeper.getEntityPosition(npcId);
             // update game state
-            const willMove = Math.random() < 0.01;
+            const willMove = Math.random() < 0.25;
             if (willMove) {
 
                 let pos = { ...oldPos };
