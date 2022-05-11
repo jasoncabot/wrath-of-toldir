@@ -1,6 +1,6 @@
 import { CharacterData, Direction } from "grid-engine";
 import { textureForEntity } from "../../assets/spritesheets/Sprites";
-import { Entity } from "../../models/events";
+import { Elevation, Entity } from "../../models/events";
 import { MainScene } from "../scenes";
 import Weapon from "./weapon";
 
@@ -9,6 +9,18 @@ export interface WalkingAnimatable {
   playWalkAnimation(direction: Direction);
   playStandAnimation(direction: Direction);
   playAttackAnimation(direction: Direction);
+}
+
+export const keyForElevation = (elevation: Elevation) => {
+  switch (elevation) {
+    case Elevation.Unknown: return undefined;
+    case Elevation.Level1: return "charLevel1";
+  }
+}
+
+export const elevationForKey = (key: string | undefined) => {
+  if (key === 'charLevel1') return Elevation.Level1;
+  return Elevation.Unknown;
 }
 
 export const normalisedFacingDirection = (direction: Direction) => {
@@ -50,7 +62,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
         collisionGroups: []
       },
       facingDirection: Direction.DOWN,
-      charLayer: entity.charLayer()!
+      charLayer: keyForElevation(entity.charLayer())
     }
     this.canAttack = true;
     this.walkingState = "stand";

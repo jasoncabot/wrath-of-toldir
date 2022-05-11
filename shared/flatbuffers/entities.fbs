@@ -84,5 +84,5 @@ table Entity {
     key: uint32;
     texture: EntityTexture;
     pos: Vec2;
-    char_layer: string;
+    char_layer: Elevation;
 }

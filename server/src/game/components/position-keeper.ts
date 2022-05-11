@@ -1,8 +1,7 @@
-import { durableObjectActionMap } from "@/handlers/maps"
-import { Vec2 } from "@/models/commands"
-import { EntityId, MapTransition, PlayerId, TiledJSON } from "../game"
+import { durableObjectActionMap } from "@/handlers/maps";
+import { Elevation } from "@/models/wrath-of-toldir/elevation";
+import { EntityId, MapTransition, PlayerId, TiledJSON } from "../game";
 
-export type Elevation = string
 type PositionKey = string
 
 export interface Position {
@@ -32,10 +31,22 @@ interface Bounds {
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
-type EntityIndex = Record<Elevation, Set<EntityId>>;
+type EntityIndex = Set<EntityId>[];
 
 const storageKey = (id: EntityId) => {
     return `${id}:pos`;
+}
+
+export const keyForElevation = (elevation: Elevation) => {
+    switch (elevation) {
+        case Elevation.Unknown: return undefined;
+        case Elevation.Level1: return "charLevel1";
+    }
+}
+
+export const elevationForKey = (key: string | undefined) => {
+    if (key === 'charLevel1') return Elevation.Level1;
+    return Elevation.Unknown;
 }
 
 export class PositionKeeper {
@@ -102,10 +113,10 @@ export class PositionKeeper {
 
         // keep a map of x,y positions with the set of entities that are occupying
         // that space at various heights for fast lookup, e.g:
-        // * {x, y} => [{1: [player1, player2], 2: [flyingMonster1]}]
+        // * {x, y} => { "1:2" => [[], [player1, player2]], "1:3" => [[npc1], [npc2]] }
         let entityIndex = this.positionIndex[this.toKey(this.positions[id].x, this.positions[id].y)];
         if (!entityIndex) {
-            entityIndex = {};
+            entityIndex = [];
             this.positionIndex[this.toKey(this.positions[id].x, this.positions[id].y)] = entityIndex;
         }
 
@@ -127,7 +138,7 @@ export class PositionKeeper {
             spawnPosition = {
                 x: Math.floor(Math.random() * this.map.width),
                 y: Math.floor(Math.random() * this.map.height),
-                z: 'charLevel1'
+                z: Elevation.Level1
             };
             if (this.isBlocked(spawnPosition)) {
                 spawnPosition = undefined;
@@ -150,16 +161,16 @@ export class PositionKeeper {
 
     getEntitiesAtPosition(position: Position, ignoringElevation = false) {
         const key = this.toKey(position.x, position.y);
-        const allElevations = this.positionIndex[key] || {};
+        const allElevations = this.positionIndex[key] || [];
         const entities: Set<EntityId> = new Set();
+        const addToEntities = (entityId: EntityId) => entities.add(entityId);
         if (ignoringElevation) {
-            Object.keys(allElevations).forEach((elevation: Elevation) => {
-                if (!allElevations[elevation]) return;
-                allElevations[elevation].forEach((entityId: EntityId) => entities.add(entityId));
-            });
+            for (const heightLayer of allElevations) {
+                if (heightLayer) heightLayer.forEach(addToEntities);
+            }
         } else {
             if (allElevations[position.z]) {
-                allElevations[position.z].forEach((entityId: EntityId) => entities.add(entityId));
+                allElevations[position.z].forEach(addToEntities);
             }
         }
         return entities;
@@ -200,7 +211,7 @@ export class PositionKeeper {
 
     getMapTransitionAtPosition(position: Position) {
         if (!this.map) return undefined;
-        const transition = this.map.layers.find(l => l.key === position.z)?.transitions.find(t => t.x === position.x && t.y === position.y);
+        const transition = this.map.layers.find(l => l.charLayer === position.z)?.transitions.find(t => t.x === position.x && t.y === position.y);
         return transition;
     }
 

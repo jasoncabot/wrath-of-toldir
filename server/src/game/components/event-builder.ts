@@ -55,12 +55,10 @@ export class EventBuilder {
     pushMovementEvent(playerId: PlayerId, pos: Position, key: number) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
-        const charLayerOffset = builder.createString(pos.z);
-
         MoveEvent.startMoveEvent(builder);
         MoveEvent.addKey(builder, key);
         MoveEvent.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y));
-        MoveEvent.addCharLayer(builder, charLayerOffset);
+        MoveEvent.addCharLayer(builder, pos.z);
 
         eventOffsets.push(MoveEvent.endMoveEvent(builder));
         eventTypeOffsets.push(Update.MoveEvent);
@@ -70,10 +68,9 @@ export class EventBuilder {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         const otherPlayerName = builder.createString(name);
-        const charLayerOffset = builder.createString(other.position.z);
 
         EntityEvent.startEntity(builder);
-        EntityEvent.addCharLayer(builder, charLayerOffset);
+        EntityEvent.addCharLayer(builder, other.position.z);
         EntityEvent.addKey(builder, other.key);
         EntityEvent.addPos(builder, Vec2.createVec2(builder, other.position.x, other.position.y));
         EntityEvent.addTexture(builder, other.texture);
@@ -94,9 +91,8 @@ export class EventBuilder {
 
         const layerOffsets = mapData.layers.map(layer => {
             const mapKeyOffset = builder.createString(layer.key);
-            const charLayerOffset = builder.createString(layer.charLayer);
             const dataOffset = MapLayer.createDataVector(builder, layer.data);
-            return MapLayer.createMapLayer(builder, mapKeyOffset, dataOffset, charLayerOffset);
+            return MapLayer.createMapLayer(builder, mapKeyOffset, dataOffset, layer.charLayer);
         });
         const tilesetOffsets = mapData.tilesets.map(set => {
             const mapKeyOffset = builder.createString(set.key);
@@ -111,10 +107,9 @@ export class EventBuilder {
         const npcOffsets = Object.keys(npcs).map(npcId => {
             const npc = npcs[npcId];
             const pos = positionKeeper.getEntityPosition(npcId);
-            const charLayerOffset = builder.createString(pos.z);
 
             EntityEvent.startEntity(builder);
-            EntityEvent.addCharLayer(builder, charLayerOffset);
+            EntityEvent.addCharLayer(builder, pos.z);
             EntityEvent.addKey(builder, npc.key);
             EntityEvent.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y));
             EntityEvent.addTexture(builder, npc.texture);
@@ -122,9 +117,8 @@ export class EventBuilder {
         })
         const npcsVectorOffset = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
 
-        const charLayerOffset = builder.createString(playerData.position.z);
         EntityEvent.startEntity(builder);
-        EntityEvent.addCharLayer(builder, charLayerOffset);
+        EntityEvent.addCharLayer(builder, playerData.position.z);
         EntityEvent.addKey(builder, playerData.key);
         EntityEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
         EntityEvent.addTexture(builder, playerData.texture);
@@ -145,11 +139,10 @@ export class EventBuilder {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         const newMapIdOffset = builder.createString(mapId);
-        const charLayerOffset = builder.createString(position.z);
         MapChangedEvent.startMapChangedEvent(builder);
         MapChangedEvent.addId(builder, newMapIdOffset);
         MapChangedEvent.addPos(builder, Vec2.createVec2(builder, position.x, position.y));
-        MapChangedEvent.addCharLayer(builder, charLayerOffset);
+        MapChangedEvent.addCharLayer(builder, position.z);
         const mapChangedEventOffset = MapChangedEvent.endMapChangedEvent(builder);
 
         eventOffsets.push(mapChangedEventOffset);

@@ -1,9 +1,8 @@
 import { CharacterData, Direction } from "grid-engine";
 import { textureForEntity } from "../../assets/spritesheets/Sprites";
-import { EntityTexture } from "../../models/commands";
 import { Entity } from "../../models/events";
 import { MainScene } from "../scenes";
-import { WalkingAnimatable } from "./playerCharacter";
+import { keyForElevation, WalkingAnimatable } from "./playerCharacter";
 
 export const normalisedFacingDirection = (direction: Direction) => {
     switch (direction) {
@@ -39,7 +38,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
                 collisionGroups: ["monster"],
             },
             facingDirection: Direction.DOWN,
-            charLayer: entity.charLayer()!
+            charLayer: keyForElevation(entity.charLayer())
         }
         this.walkingState = "stand";
 

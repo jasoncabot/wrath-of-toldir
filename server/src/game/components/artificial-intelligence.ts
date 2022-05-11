@@ -1,10 +1,10 @@
 import { Connection } from "@/durable-objects/map";
-import { EntityId, NPC, PlayerId, TiledJSON } from "../game";
+import { Entity, EntityId, PlayerId, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
 import { PositionKeeper } from "./position-keeper";
 
 export class ArtificialIntelligence {
-    npcs: Record<EntityId, NPC>;
+    npcs: Record<EntityId, Entity>;
     connections: Record<PlayerId, Connection>;
     positionKeeper: PositionKeeper;
     eventBuilder: EventBuilder;

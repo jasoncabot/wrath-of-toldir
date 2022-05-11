@@ -4,13 +4,17 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 
 ## TODO List
 
-- [ ] Simple mobile controls using a virtual joystick
 - [ ] HUD - switch between physical and magical attack (numbers 1, 2, 3)
+- [ ] Actually spend some time making the React app frame look semi-decent
+- [ ] Dynamic Lighting
+- [ ] Sounds
+- [ ] Monsters should fight back
 - [ ] Magic Attacks
 - [ ] Joining a map should only tell you about stuff you can see (so not all people / npcs and their positions)
 - [ ] Item system should hold inventory
 - [ ] Loot items
 - [ ] Water should be animated
+- [X] Simple mobile controls using a virtual joystick
 - [X] Attacks should kill NPC
 - [X] Chat bubbles
 - [X] Transitioning between maps should put you in the right position

@@ -2,6 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { Elevation } from '../wrath-of-toldir/elevation';
 import { EntityTexture } from '../wrath-of-toldir/entity-texture';
 import { Vec2 } from '../wrath-of-toldir/vec2';
 
@@ -39,11 +40,9 @@ pos(obj?:Vec2):Vec2|null {
   return offset ? (obj || new Vec2()).__init(this.bb_pos + offset, this.bb!) : null;
 }
 
-charLayer():string|null
-charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-charLayer(optionalEncoding?:any):string|Uint8Array|null {
+charLayer():Elevation {
   const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : Elevation.Unknown;
 }
 
 static startEntity(builder:flatbuffers.Builder) {
@@ -62,8 +61,8 @@ static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
   builder.addFieldStruct(2, posOffset, 0);
 }
 
-static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, charLayerOffset, 0);
+static addCharLayer(builder:flatbuffers.Builder, charLayer:Elevation) {
+  builder.addFieldInt8(3, charLayer, Elevation.Unknown);
 }
 
 static endEntity(builder:flatbuffers.Builder):flatbuffers.Offset {

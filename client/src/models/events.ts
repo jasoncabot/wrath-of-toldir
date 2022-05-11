@@ -1,4 +1,5 @@
 export { AttackData, unionToAttackData, unionListToAttackData } from './wrath-of-toldir/attacks/attack-data';
+export { Elevation } from './wrath-of-toldir/elevation';
 export { Entity } from './wrath-of-toldir/entity';
 export { AttackEvent } from './wrath-of-toldir/events/attack-event';
 export { ChatEvent } from './wrath-of-toldir/events/chat-event';

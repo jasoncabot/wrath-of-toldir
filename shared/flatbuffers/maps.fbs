@@ -5,6 +5,11 @@ struct Vec2 {
   y:short;
 }
 
+enum Elevation : byte {
+    Unknown,
+    Level1
+}
+
 namespace WrathOfToldir.Maps;
 
 table TileCollision {
@@ -15,7 +20,7 @@ table TileCollision {
 table MapLayer {
     key: string;
     data: [uint16];
-    char_layer: string;
+    char_layer: Elevation;
 }
 
 table TileSet {

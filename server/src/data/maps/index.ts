@@ -1,4 +1,6 @@
+import { elevationForKey } from '@/game/components/position-keeper';
 import { MapDataLayer, MapTileSet, MapTileSetCollision, MapTransition, TiledJSON } from '@/game/game';
+import { Elevation } from '@/models/events';
 import fisherswatch from './fisherswatch.json';
 import testroom1 from './testroom1.json';
 
@@ -68,12 +70,12 @@ export const loadMapData = (mapId: string) => {
     return {
         id: mapId,
         layers: map.layers.map((layer: any) => {
-            let charLayer = undefined;
+            let charLayer = Elevation.Unknown;
             let transitions: MapTransition[] = [];
 
             for (let keyValuePair of (layer.properties || []) as { name: string, value: string }[]) {
                 if (keyValuePair.name === "ge_charLayer") {
-                    charLayer = keyValuePair.value;
+                    charLayer = elevationForKey(keyValuePair.value);
                 }
 
                 if (keyValuePair.name.startsWith("transition_")) {
@@ -85,7 +87,7 @@ export const loadMapData = (mapId: string) => {
                         x: parseInt(startX, 10),
                         y: parseInt(startY, 10),
                         targetId: mapId,
-                        target: { x: parseInt(targetX, 10), y: parseInt(targetY, 10), z }
+                        target: { x: parseInt(targetX, 10), y: parseInt(targetY, 10), z: elevationForKey(z) }
                     })
                 }
             }

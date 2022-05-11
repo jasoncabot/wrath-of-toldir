@@ -3,8 +3,8 @@ import { Direction, GridEngine } from 'grid-engine';
 import { AnimatedSpriteDirectionalFrames, entityTextureNames, textureMap } from "../../assets/spritesheets/Sprites";
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
-import { Action, EntityTexture, JoinCommand, MoveCommand, SpawnCommand, Vec2 } from '../../models/commands';
-import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
+import { Action, JoinCommand, MoveCommand, SpawnCommand, Vec2 } from '../../models/commands';
+import { AttackData, AttackEvent, DamageState, Elevation, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
 import { ChatCommand } from '../../models/wrath-of-toldir/commands/chat-command';
@@ -18,7 +18,7 @@ import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
 import ChatDialog from '../objects/chatDialog';
 import Monster from '../objects/monster';
-import { normalisedFacingDirection, WalkingAnimatable } from '../objects/playerCharacter';
+import { keyForElevation, normalisedFacingDirection, WalkingAnimatable } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
 import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
 import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
@@ -461,8 +461,8 @@ export default class MainScene extends Phaser.Scene {
         height: map.height()!
       });
 
-      const charLayer = layer.charLayer();
-      if (charLayer && charLayer.length > 0) {
+      const charLayer = keyForElevation(layer.charLayer());
+      if (charLayer) {
         layerData.properties.push({
           name: 'ge_charLayer',
           type: 'string',

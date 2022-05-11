@@ -8,7 +8,7 @@ namespace WrathOfToldir.Events;
 table MoveEvent {
     key: uint32;
     pos: Vec2;
-    char_layer: string;
+    char_layer: Elevation;
 }
 
 table JoinEvent {
@@ -48,7 +48,7 @@ table MapJoinedEvent {
 table MapChangedEvent {
     id: string;
     pos: Vec2;
-    char_layer: string;
+    char_layer: Elevation;
 }
 
 union Update { 

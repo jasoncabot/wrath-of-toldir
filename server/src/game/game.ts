@@ -1,4 +1,5 @@
 import { EntityTexture } from "@/models/commands"
+import { Elevation } from "@/models/events"
 import { Command } from "@/models/wrath-of-toldir/commands/command"
 import { Position } from "./components/position-keeper"
 
@@ -25,7 +26,7 @@ export interface MapTransition {
 export interface MapDataLayer {
     key: string
     data: number[]
-    charLayer: string | undefined
+    charLayer: Elevation
     transitions: MapTransition[]
 }
 

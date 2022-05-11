@@ -2,6 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { Elevation } from '../../wrath-of-toldir/elevation';
+
+
 export class MapLayer {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -42,11 +45,9 @@ dataArray():Uint16Array|null {
   return offset ? new Uint16Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
-charLayer():string|null
-charLayer(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-charLayer(optionalEncoding?:any):string|Uint8Array|null {
+charLayer():Elevation {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : Elevation.Unknown;
 }
 
 static startMapLayer(builder:flatbuffers.Builder) {
@@ -78,8 +79,8 @@ static startDataVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(2, numElems, 2);
 }
 
-static addCharLayer(builder:flatbuffers.Builder, charLayerOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, charLayerOffset, 0);
+static addCharLayer(builder:flatbuffers.Builder, charLayer:Elevation) {
+  builder.addFieldInt8(2, charLayer, Elevation.Unknown);
 }
 
 static endMapLayer(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -87,11 +88,11 @@ static endMapLayer(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createMapLayer(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset, dataOffset:flatbuffers.Offset, charLayerOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createMapLayer(builder:flatbuffers.Builder, keyOffset:flatbuffers.Offset, dataOffset:flatbuffers.Offset, charLayer:Elevation):flatbuffers.Offset {
   MapLayer.startMapLayer(builder);
   MapLayer.addKey(builder, keyOffset);
   MapLayer.addData(builder, dataOffset);
-  MapLayer.addCharLayer(builder, charLayerOffset);
+  MapLayer.addCharLayer(builder, charLayer);
   return MapLayer.endMapLayer(builder);
 }
 }

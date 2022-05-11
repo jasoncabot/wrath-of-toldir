@@ -8,6 +8,7 @@ import { Entity, EntityId, MapTransition, PlayerId, ReceivedCommand, TiledJSON }
 import { EventBuilder } from "./event-builder";
 import { Position, PositionKeeper } from "./position-keeper";
 import { v4 as uuidv4 } from 'uuid';
+import { Elevation } from "@/models/events";
 
 export type CharacterDetailLookup = (playerId: PlayerId, characterId: PlayerId) => Promise<{ name: string, texture: EntityTexture }>;
 
@@ -194,10 +195,10 @@ export class CommandQueue {
                     // update game state
                     const npcId = uuidv4();
                     const npcKey = Math.floor(Math.random() * 2147483647);
-                    const position = {
+                    const position: Position = {
                         x: spawn.pos()!.x(),
                         y: spawn.pos()!.y(),
-                        z: 'charLevel1'
+                        z: Elevation.Level1
                     };
                     const entity = {
                         key: npcKey,
@@ -231,7 +232,7 @@ export class CommandQueue {
             } break;
             case AttackData.MagicAttack: {
                 const atk = attack.data(new MagicAttack()) as MagicAttack;
-                facingPosition = { x: atk.targetPos()!.x(), y: atk.targetPos()!.y(), z: "" };
+                facingPosition = { x: atk.targetPos()!.x(), y: atk.targetPos()!.y(), z: Elevation.Level1 };
             } break;
         }
 

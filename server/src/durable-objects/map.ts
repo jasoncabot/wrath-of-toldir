@@ -3,7 +3,7 @@ import { ArtificialIntelligence } from "@/game/components/artificial-intelligenc
 import { CommandQueue } from "@/game/components/command-queue";
 import { EventBuilder } from "@/game/components/event-builder";
 import { Position, PositionKeeper } from "@/game/components/position-keeper";
-import { EntityId, NPC, PlayerId, TiledJSON } from "@/game/game";
+import { Entity, EntityId, PlayerId, TiledJSON } from "@/game/game";
 import { Action, LeaveCommand } from "@/models/commands";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Builder, ByteBuffer } from "flatbuffers";
@@ -27,7 +27,7 @@ export class Map implements DurableObject {
     commandQueue!: CommandQueue;
     mapData: TiledJSON | undefined;
     tickCount: number = 0;
-    npcs: Record<EntityId, NPC>;
+    npcs: Record<EntityId, Entity>;
     positionKeeper: PositionKeeper;
     eventBuilder: EventBuilder;
     ai!: ArtificialIntelligence;
@@ -51,18 +51,6 @@ export class Map implements DurableObject {
         this.positionKeeper.updateWithMap(this.mapData);
         this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.env.COMBAT);
         this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs);
-
-        // // Create NPCs
-        // // TODO: this is just temporary to see some stuff
-        // this.state.storage.list({prefix})
-        // for (let i = 0; i < 10; i++) {
-        //     const npcId = uuidv4();
-        //     this.npcs[npcId] = {
-        //         key: Math.floor(Math.random() * 2147483647),
-        //         type: "slime1",
-        //     };
-        //     this.positionKeeper.spawnEntityAtFreePosition(npcId);
-        // }
     }
 
     async fetch(request: Request) {

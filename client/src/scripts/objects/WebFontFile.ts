@@ -1,5 +1,4 @@
 import Phaser from 'phaser'
-
 import WebFontLoader from 'webfontloader'
 
 export type FontName = string
