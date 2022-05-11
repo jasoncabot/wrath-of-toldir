@@ -148,6 +148,7 @@ export class MovementController extends Phaser.GameObjects.Image {
         if (angleToPointer >= 0.39269908169) direction = Direction.UP_LEFT;
         if (angleToPointer >= 1.1780972451) direction = Direction.UP;
         if (angleToPointer >= 1.96349540849) direction = Direction.UP_RIGHT;
+        if (angleToPointer >= 2.74889357189) direction = Direction.RIGHT;
         return direction;
     }
 }
