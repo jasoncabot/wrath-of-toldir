@@ -18,7 +18,7 @@ import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
 import ChatDialog from '../objects/chatDialog';
 import Monster from '../objects/monster';
-import { WalkingAnimatable } from '../objects/playerCharacter';
+import { normalisedFacingDirection, WalkingAnimatable } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
 import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
 import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
@@ -245,7 +245,9 @@ export default class MainScene extends Phaser.Scene {
   }
 
   submitAttack() {
-    const facing = this.gridEngine.getFacingDirection(this.player.identifier);
+    // we can only attack in a direction we are facing (otherwise it's confusing since we don't have diagonal artwork, so 
+    // it appears as if you're hitting an enemy but missing them!)
+    const facing = normalisedFacingDirection(this.gridEngine.getFacingDirection(this.player.identifier));
 
     // TODO: attack with magic
     // if (this.selectedAttackType == AttackData.MAGIC) ...
