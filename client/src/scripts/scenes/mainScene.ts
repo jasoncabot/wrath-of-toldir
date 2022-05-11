@@ -57,6 +57,7 @@ export default class MainScene extends Phaser.Scene {
   player: PlayerCharacter
   playerCharacters: PlayerCharacter[];
   movementController: MovementController;
+  collisionDisplayLayer: Phaser.Tilemaps.TilemapLayer;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -161,6 +162,9 @@ export default class MainScene extends Phaser.Scene {
       return;
     } else if (text.startsWith("/debug")) {
       this.debugText.visible = !this.debugText.visible;
+      return;
+    } else if (text.startsWith("/collisions")) {
+      this.collisionDisplayLayer.setVisible(!this.collisionDisplayLayer.visible);
       return;
     } else if (text.startsWith("/spawn")) {
       // /spawn 1:1 babySlime1
@@ -495,8 +499,9 @@ export default class MainScene extends Phaser.Scene {
     for (let i = 0; i < map.layersLength(); i++) {
       const layer = map.layers(i, new MapLayer())!;
       const tileDisplayLayer = this.map.createLayer(layer.key()!, tilesetLayers, 0, 0);
-      // HACK - just for debugging - won't always be called ground on a map
-      if (layer.key() == "charLevel1") tileDisplayLayer.setAlpha(0.3).setVisible(false);
+      if (layer.key() == "charLevel1") {
+        this.collisionDisplayLayer = tileDisplayLayer.setAlpha(0.3).setVisible(false);
+      }
       this.interfaceCamera.ignore(tileDisplayLayer);
     }
 
