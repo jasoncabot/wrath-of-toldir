@@ -5,6 +5,9 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 ## TODO List
 
 - [ ] HUD - switch between physical and magical attack (numbers 1, 2, 3)
+- [ ] Interact with objects / friendly NPCs
+- [ ] Quests
+- [ ] Character should gain/lose health/mana/experience
 - [ ] Actually spend some time making the React app frame look semi-decent
 - [ ] Dynamic Lighting
 - [ ] Sounds
