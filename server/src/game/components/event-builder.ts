@@ -116,7 +116,7 @@ export class EventBuilder {
             EntityEvent.startEntity(builder);
             EntityEvent.addCharLayer(builder, charLayerOffset);
             EntityEvent.addKey(builder, npc.key);
-            EntityEvent.addPos(builder, Vec2.createVec2(builder, npc.position.x, npc.position.y));
+            EntityEvent.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y));
             EntityEvent.addTexture(builder, npc.texture);
             return EntityEvent.endEntity(builder);
         })
