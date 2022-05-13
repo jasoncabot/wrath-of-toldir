@@ -241,11 +241,11 @@ export class CommandQueue {
         if (targetEntityIds.size > 0) {
             const playerIdCombat = this.combat.idFromName(playerId);
             const stub = this.combat.get(playerIdCombat);
-            const result = await stub.fetch(`http://combat/?action=attack`, {
+            const result: AttackResult[] = await stub.fetch(`http://combat/?action=attack`, {
                 method: 'POST',
                 body: JSON.stringify({ targets: Array.from(targetEntityIds.values()) })
-            });
-            (await result.json() as AttackResult[]).forEach(({ entityId, damage, state }) => {
+            }).then(attack => attack.json() as unknown as AttackResult[]);
+            result.forEach(({ entityId, damage, state }) => {
                 const npc = this.npcs[entityId];
                 if (!npc) return;
                 damages.push({

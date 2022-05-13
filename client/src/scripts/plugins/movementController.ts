@@ -1,4 +1,4 @@
-import { Direction } from "grid-engine";
+import { Direction, Position } from "grid-engine";
 import { PlayerCharacter } from "../objects";
 import { MainScene } from "../scenes";
 
@@ -6,7 +6,15 @@ export const DefaultActionTriggered = 'default-action-triggered';
 
 const PI_2 = Math.PI / 2;
 
+const convertToPosition = (x: number, y: number) => {
+    return {
+        x: Math.floor(x / 48),
+        y: Math.floor(y / 48),
+    } as Position;
+}
+
 export class MovementController extends Phaser.GameObjects.Image {
+    shouldMove: boolean;
     direction: Direction;
 
     private fireDefaultAction: boolean;
@@ -16,7 +24,7 @@ export class MovementController extends Phaser.GameObjects.Image {
     constructor(scene: MainScene, plugin: PlayerMovementPlugin) {
         super(scene, 0, 0, 'joystick-base');
 
-        this.setPointerCount(0);
+        this.setPointerCount(0, { x: 0, y: 0 });
 
         scene.input.on(Phaser.Input.Events.POINTER_DOWN, this.onPointerDown, this);
         scene.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
@@ -30,6 +38,8 @@ export class MovementController extends Phaser.GameObjects.Image {
     }
 
     updateDirection(player: PlayerCharacter, cursors: Phaser.Types.Input.Keyboard.CursorKeys) {
+        this.shouldMove = true;
+
         // try processing keys first, we don't need to be active to do that...
         if (cursors.up.isDown && !cursors.down.isDown) {
             if (cursors.left.isDown && !cursors.right.isDown) {
@@ -55,11 +65,14 @@ export class MovementController extends Phaser.GameObjects.Image {
             if (this.scene.input.mousePointer.isDown) {
                 this.updatePositionFromMouse(this.scene.input.mousePointer, player, cursors);
             } else {
-                this.updatePositionFromJoystick();
+                this.updatePositionFromJoystick(player);
             }
         } else {
             this.direction = Direction.NONE;
+            this.shouldMove = false;
         }
+
+        this.shouldMove = this.shouldMove && !cursors.shift.isDown;
     }
 
     setActive(value: boolean): this {
@@ -75,21 +88,25 @@ export class MovementController extends Phaser.GameObjects.Image {
     }
 
     onPointerDown(event: PointerEvent) {
-        this.setPointerCount(this.pointerCount + 1);
+        const tilePosition = convertToPosition(this.scene.input.activePointer.worldX, this.scene.input.activePointer.worldY);
+        this.setPointerCount(this.pointerCount + 1, tilePosition);
     }
 
     onPointerUp(event: PointerEvent) {
-        this.setPointerCount(this.pointerCount - 1);
+        const tilePosition = convertToPosition(this.scene.input.activePointer.worldX, this.scene.input.activePointer.worldY);
+        // in theory we can have more up than down events when a user presses down on an action button that swallows the event
+        // but up on the main scene that allows the event to bubble, so we just cap it at 0
+        this.setPointerCount(Math.max(this.pointerCount - 1, 0), tilePosition);
     }
 
-    setPointerCount(count: number) {
+    setPointerCount(count: number, position: Position) {
         this.pointerCount = count;
 
         if (this.pointerCount > 0) {
             this.setActive(true);
         } else {
             if (this.fireDefaultAction) {
-                this.emit(DefaultActionTriggered);
+                this.emit(DefaultActionTriggered, this.direction, position);
             }
 
             this.setActive(false);
@@ -107,12 +124,13 @@ export class MovementController extends Phaser.GameObjects.Image {
 
         this.direction = this.directionBetween(player.getCenter(), { x: pointer.worldX, y: pointer.worldY });
 
+        const position = convertToPosition(pointer.worldX, pointer.worldY);
         if (cursors.shift.isDown) {
-            this.emit(DefaultActionTriggered);
+            this.emit(DefaultActionTriggered, this.direction, position);
         }
     }
 
-    updatePositionFromJoystick() {
+    updatePositionFromJoystick(player: PlayerCharacter) {
         // pointer 1 is dpad
         // pointer 2 is button
         // unless pointer1 is just tapped (e.g doesn't move more than the threshold amount)
@@ -129,12 +147,14 @@ export class MovementController extends Phaser.GameObjects.Image {
                 this.direction = this.directionBetween(this.getCenter(), this.scene.input.pointer1);
                 this.fireDefaultAction = false;
             } else {
-                this.direction = Direction.NONE;
+                this.shouldMove = false;
+                this.direction = this.directionBetween(player.getCenter(), { x: this.scene.input.pointer1.worldX, y: this.scene.input.pointer1.worldY });
             }
         }
 
         if (this.scene.input.pointer2.isDown) {
-            this.emit(DefaultActionTriggered);
+            const position = convertToPosition(this.scene.input.pointer2.worldX, this.scene.input.pointer2.worldY);
+            this.emit(DefaultActionTriggered, this.direction, position);
         }
     }
 

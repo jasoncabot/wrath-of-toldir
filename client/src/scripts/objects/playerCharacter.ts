@@ -41,6 +41,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   identifier: string;
   gridEngineCharacterData: CharacterData;
   canAttack: boolean
+  canMagic: boolean;
   weaponSprite: Weapon | undefined;
   nameBadge: Phaser.GameObjects.Text;
   speechBubble: Phaser.GameObjects.Text;
@@ -65,6 +66,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
       charLayer: keyForElevation(entity.charLayer())
     }
     this.canAttack = true;
+    this.canMagic = true;
     this.walkingState = "stand";
 
     scene.add.existing(this);
@@ -122,6 +124,12 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   }
 
   playAttackAnimation(direction: Direction) {
+    if (direction === Direction.NONE) return;
+
+    if (!this.weaponSprite) {
+      this.weaponSprite = new Weapon(this.scene as MainScene, this.getCenter().x, this.getCenter().y, this.identifier);
+    }
+
     const oldState = this.walkingState;
     this.walkingState = "attack";
 

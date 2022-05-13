@@ -1,5 +1,5 @@
 import { Builder, ByteBuffer } from "flatbuffers";
-import { Direction, GridEngine } from 'grid-engine';
+import { Direction, GridEngine, Position } from 'grid-engine';
 import { AnimatedSpriteDirectionalFrames, entityTextureNames, textureMap } from "../../assets/spritesheets/Sprites";
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
@@ -16,6 +16,7 @@ import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
+import ActionButton, { ActionButtonSelected, ActionButtonType } from "../objects/actionButton";
 import ChatDialog from '../objects/chatDialog';
 import Monster from '../objects/monster';
 import { keyForElevation, normalisedFacingDirection, WalkingAnimatable } from '../objects/playerCharacter';
@@ -58,6 +59,10 @@ export default class MainScene extends Phaser.Scene {
   playerCharacters: PlayerCharacter[];
   movementController: MovementController;
   collisionDisplayLayer: Phaser.Tilemaps.TilemapLayer;
+
+  actionButton1: ActionButton;
+  actionButton2: ActionButton;
+  actionButton3: ActionButton;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -107,22 +112,40 @@ export default class MainScene extends Phaser.Scene {
     this.interfaceCamera = this.cameras.add();
     this.input.addPointer(3); // support multitouch
 
-    this.debugText = new DebugText(this).setVisible(false);
+    this.debugText = new DebugText(this);
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
-    this.cameras.main.ignore([this.debugText, hud]);
+    this.cameras.main.ignore(hud);
+
+    const onActionButtonSelected = (index: number) => {
+      // we don't couple this to ActionButtonType to allow them to be remapped
+      // or having more than 3 actions
+      [
+        this.actionButton1,
+        this.actionButton2,
+        this.actionButton3
+      ].forEach((button, idx) => button.setSelected(idx == index));
+    }
+
+    this.actionButton1 = new ActionButton(this, 425, 567, ActionButtonType.NormalAttack).setSelected(true).on(ActionButtonSelected, () => onActionButtonSelected(0));
+    this.actionButton2 = new ActionButton(this, 474, 567, ActionButtonType.MagicAttack).setSelected(false).on(ActionButtonSelected, () => onActionButtonSelected(1));
+    this.actionButton3 = new ActionButton(this, 523, 567, ActionButtonType.Potion).setSelected(false).on(ActionButtonSelected, () => onActionButtonSelected(2));
 
     this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
 
     this.movementController = this.add.joystick();
-    this.movementController.on(DefaultActionTriggered, () => {
-      setTimeout(() => {
-        this.applyDefaultAction();
-      }, 0);
+    this.movementController.on(DefaultActionTriggered, (direction: Direction, position: Position) => {
+      this.applyDefaultAction(direction, position);
     });
 
     this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
       if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
         this.chatOverlay.focus();
+      } else if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.ONE) {
+        onActionButtonSelected(0);
+      } else if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.TWO) {
+        onActionButtonSelected(1);
+      } else if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.THREE) {
+        onActionButtonSelected(2);
       }
     });
     this.transitionToInitial(currentCharacterRegion());
@@ -135,15 +158,17 @@ export default class MainScene extends Phaser.Scene {
     this.movementController.updateDirection(this.player, this.cursors);
     this.debugText.update();
 
-    if (this.cursors.shift.isDown) {
-      this.gridEngine.stopMovement(this.player.identifier);
-      this.gridEngine.turnTowards(this.player.identifier, this.movementController.direction);
-    } else {
+    if (this.movementController.shouldMove) {
       this.gridEngine.move(this.player.identifier, this.movementController.direction);
+    } else {
+      this.gridEngine.turnTowards(this.player.identifier, this.movementController.direction);
+      this.gridEngine.stopMovement(this.player.identifier);
     }
 
     if (this.cursors.space.isDown) {
-      this.applyDefaultAction();
+      const direction = this.gridEngine.getFacingDirection(this.player.identifier);
+      const lookingAtPosition = this.gridEngine.getFacingPosition(this.player.identifier);
+      this.applyDefaultAction(direction, lookingAtPosition);
     }
 
     this.playerCharacters.forEach(pc => pc.updateAttachedSprites());
@@ -248,17 +273,31 @@ export default class MainScene extends Phaser.Scene {
     return ws;
   }
 
-  submitAttack() {
+  submitMagic(targetKey: number, direction: Direction, position: Position) {
+    // facing in direction, we launch a magic attack against position, targetting 
+    // the game object with the specified key
+    let builder = new Builder(128);
+
+    MagicAttack.startMagicAttack(builder);
+    MagicAttack.addTargetKey(builder, targetKey);
+    MagicAttack.addTargetPos(builder, Vec2.createVec2(builder, position.x, position.y));
+    const magicAttackOffset = MagicAttack.endMagicAttack(builder);
+
+    const attack = AttackCommand.createAttackCommand(builder, AttackData.MagicAttack, magicAttackOffset);
+    Command.startCommand(builder);
+    Command.addSeq(builder, ++this.commandSequencer);
+    Command.addActionType(builder, Action.AttackCommand);
+    Command.addAction(builder, attack);
+    const update = Command.endCommand(builder);
+    builder.finish(update);
+    this.connection?.send(builder.asUint8Array());
+  }
+
+  submitAttack(direction: Direction) {
     // we can only attack in a direction we are facing (otherwise it's confusing since we don't have diagonal artwork, so 
     // it appears as if you're hitting an enemy but missing them!)
-    const facing = normalisedFacingDirection(this.gridEngine.getFacingDirection(this.player.identifier));
+    const facing = normalisedFacingDirection(direction);
 
-    // TODO: attack with magic
-    // if (this.selectedAttackType == AttackData.MAGIC) ...
-
-    if (!this.player.weaponSprite) {
-      this.player.weaponSprite = new Weapon(this, this.player.getCenter().x, this.player.getCenter().y, this.player.identifier);
-    }
     this.player.playAttackAnimation(facing);
 
     let builder = new Builder(1024);
@@ -274,19 +313,41 @@ export default class MainScene extends Phaser.Scene {
     this.connection?.send(builder.asUint8Array());
   }
 
-  applyDefaultAction() {
+  applyDefaultAction(direction: Direction, position: Position) {
     if (this.currentState !== MapSceneState.READY) return;
 
-    // TODO: depending on what we have selected we might choose to do something different
-    // than just plain attacking
-    const lookingAtPosition = this.gridEngine.getFacingPosition(this.player.identifier);
-    const tile = this.map.getTileAt(lookingAtPosition.x, lookingAtPosition.y);
     // TODO: if we are facing something interesting
+    // This is awful, we should just be able to go from position -> to all sprites by looking at our 
+    // sets of NPCs
+    const charId = this.gridEngine.getAllCharacters().map(id => {
+      return {
+        id: id, pos: this.gridEngine.getPosition(id)
+      }
+    }).find(x => x.pos.x === position.x && x.pos.y === position.y)?.id;
+    const targetKey = charId ? parseInt((this.gridEngine.getSprite(charId) as any).identifier, 10) : 0;
 
-    if (this.player.canAttack) {
-      this.player.canAttack = false;
-      this.time.delayedCall(500, () => { this.player.canAttack = true });
-      this.submitAttack();
+    const type = [this.actionButton1, this.actionButton2, this.actionButton3].find(b => b.isSelected)!.actionType;
+    switch (type) {
+      case ActionButtonType.NormalAttack: {
+        if (!this.player.canAttack) break;
+
+        this.player.canAttack = false;
+        this.time.delayedCall(500, () => { this.player.canAttack = true });
+        this.submitAttack(direction);
+        break;
+      }
+      case ActionButtonType.MagicAttack: {
+        if (!this.player.canMagic) break;
+
+        this.player.canMagic = false;
+        this.time.delayedCall(500, () => { this.player.canMagic = true });
+        this.submitMagic(targetKey, direction, position);
+        break;
+      }
+      case ActionButtonType.Potion: {
+        // TODO: apply a potion if we have one
+        break;
+      }
     }
   }
 
@@ -334,10 +395,6 @@ export default class MainScene extends Phaser.Scene {
               const normalDirection = Directions[normal.facing()];
               const otherPlayer = this.gridEngine.getSprite(key) as PlayerCharacter;
               this.gridEngine.turnTowards(key, normalDirection);
-
-              if (!otherPlayer.weaponSprite) {
-                otherPlayer.weaponSprite = new Weapon(this, otherPlayer.getCenter().x, otherPlayer.getCenter().y, key);
-              }
               otherPlayer.playAttackAnimation(normalDirection);
               break;
             case AttackData.MagicAttack:

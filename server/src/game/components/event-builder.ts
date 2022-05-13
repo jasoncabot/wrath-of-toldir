@@ -176,10 +176,9 @@ export class EventBuilder {
                 break;
             case AttackData.MagicAttack:
                 const magic = attack.data(new MagicAttack()) as MagicAttack;
-                const targetPosOffset = Vec2.createVec2(builder, magic.targetPos()!.x(), magic.targetPos()!.y());
                 MagicAttack.startMagicAttack(builder);
                 MagicAttack.addTargetKey(builder, magic.targetKey());
-                MagicAttack.addTargetPos(builder, targetPosOffset);
+                MagicAttack.addTargetPos(builder, Vec2.createVec2(builder, magic.targetPos()!.x(), magic.targetPos()!.y()));
                 dataOffset = MagicAttack.endMagicAttack(builder);
                 break;
         }

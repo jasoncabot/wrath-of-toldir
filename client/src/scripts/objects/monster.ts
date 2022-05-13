@@ -72,6 +72,7 @@ export default class Monster extends Phaser.Physics.Arcade.Sprite implements Wal
     }
 
     playAttackAnimation(direction: Direction) {
+        if (direction === Direction.NONE) return;
         const oldState = this.walkingState;
         this.walkingState = "attack";
         const anim = this.texture.key + "_attack_" + normalisedFacingDirection(direction);
