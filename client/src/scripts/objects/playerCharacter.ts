@@ -60,7 +60,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
         y: entity.pos()!.y()
       },
       collides: {
-        collisionGroups: []
+        collisionGroups: ["monster"]
       },
       facingDirection: Direction.DOWN,
       charLayer: keyForElevation(entity.charLayer())
