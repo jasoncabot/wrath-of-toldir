@@ -104,6 +104,7 @@ export class MovementController extends Phaser.GameObjects.Image {
 
         if (this.pointerCount > 0) {
             this.setActive(true);
+            this.setVisible(false); // so we don't flash up the joystick on taps
         } else {
             if (this.fireDefaultAction) {
                 this.emit(DefaultActionTriggered, this.direction, position);
@@ -144,6 +145,7 @@ export class MovementController extends Phaser.GameObjects.Image {
 
             const movementThreshold = 4000;
             if (Phaser.Math.Distance.BetweenPointsSquared(this.getCenter(), this.scene.input.pointer1) > movementThreshold) {
+                this.setVisible(true);
                 this.direction = this.directionBetween(this.getCenter(), this.scene.input.pointer1);
                 this.fireDefaultAction = false;
             } else {
