@@ -39,6 +39,11 @@
                  "value":"charLevel1"
                 }, 
                 {
+                 "name":"transition_testdungeon1",
+                 "type":"string",
+                 "value":"28:81=>1:23:charLevel1"
+                }, 
+                {
                  "name":"transition_testroom1",
                  "type":"string",
                  "value":"80:28=>4:8:charLevel1"

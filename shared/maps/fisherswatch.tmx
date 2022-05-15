@@ -225,6 +225,7 @@
  <layer id="3" name="charLevel1" width="100" height="100" opacity="0.5">
   <properties>
    <property name="ge_charLayer" value="charLevel1"/>
+   <property name="transition_testdungeon1" value="28:81=&gt;1:23:charLevel1"/>
    <property name="transition_testroom1" value="80:28=&gt;4:8:charLevel1"/>
   </properties>
   <data encoding="csv">
