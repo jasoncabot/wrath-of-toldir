@@ -18,6 +18,7 @@ import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
 import ActionButton, { ActionButtonSelected, ActionButtonType } from "../objects/actionButton";
 import ChatDialog from '../objects/chatDialog';
+import LabelledBar, { LabelledBarDataSource, LabelledBarType } from "../objects/labelledBar";
 import Monster from '../objects/monster';
 import { keyForElevation, normalisedFacingDirection, WalkingAnimatable } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
@@ -63,6 +64,9 @@ export default class MainScene extends Phaser.Scene {
   actionButton1: ActionButton;
   actionButton2: ActionButton;
   actionButton3: ActionButton;
+  healthBar: LabelledBar;
+  magicBar: LabelledBar;
+  experienceBar: LabelledBar;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -129,6 +133,25 @@ export default class MainScene extends Phaser.Scene {
     this.actionButton1 = new ActionButton(this, 425, 567, ActionButtonType.NormalAttack).setSelected(true).on(ActionButtonSelected, () => onActionButtonSelected(0));
     this.actionButton2 = new ActionButton(this, 474, 567, ActionButtonType.MagicAttack).setSelected(false).on(ActionButtonSelected, () => onActionButtonSelected(1));
     this.actionButton3 = new ActionButton(this, 523, 567, ActionButtonType.Potion).setSelected(false).on(ActionButtonSelected, () => onActionButtonSelected(2));
+
+    const ds: LabelledBarDataSource = {
+      health: { current: 50, max: 50 },
+      magic: { current: 20, max: 20 },
+      experience: { current: 210, max: 1000, level: 1 },
+    };
+
+    this.healthBar = new LabelledBar(this, 12, 504, LabelledBarType.Health, ds);
+    this.magicBar = new LabelledBar(this, 12, 525, LabelledBarType.Magic, ds);
+    this.experienceBar = new LabelledBar(this, 12, 546, LabelledBarType.Experience, ds);
+
+    // TODO: remove this
+    ds.health.current = Math.ceil(Math.random() * ds.health.max);
+    ds.magic.current = Math.ceil(Math.random() * ds.magic.max);
+    ds.experience.current = Math.ceil(Math.random() * ds.experience.max);
+    this.healthBar.onDataSourceUpdated(ds);
+    this.magicBar.onDataSourceUpdated(ds);
+    this.experienceBar.onDataSourceUpdated(ds);
+    // TODO: end remove this
 
     this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
 

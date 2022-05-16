@@ -4,7 +4,6 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 
 ## TODO List
 
-- [ ] HUD - switch between physical and magical attack (numbers 1, 2, 3)
 - [ ] Interact with objects / friendly NPCs
 - [ ] Quests
 - [ ] Character should gain/lose health/mana/experience
@@ -17,6 +16,9 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 - [ ] Item system should hold inventory
 - [ ] Loot items
 - [ ] Water should be animated
+- [ ] Fishing
+- [ ] Crafting
+- [X] HUD - switch between physical and magical attack (numbers 1, 2, 3)
 - [X] Simple mobile controls using a virtual joystick
 - [X] Attacks should kill NPC
 - [X] Chat bubbles
