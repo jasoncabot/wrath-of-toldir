@@ -1,7 +1,10 @@
 import { Connection } from "@/durable-objects/map";
 import { Entity, EntityId, PlayerId, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
-import { PositionKeeper } from "./position-keeper";
+import { Position, PositionKeeper } from "./position-keeper";
+import { v4 as uuidv4 } from 'uuid';
+import { Elevation } from "@/models/events";
+import { EntityTexture } from "@/models/commands";
 
 export class ArtificialIntelligence {
     npcs: Record<EntityId, Entity>;
@@ -10,7 +13,7 @@ export class ArtificialIntelligence {
     eventBuilder: EventBuilder;
     map: TiledJSON;
 
-    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, NPC>) {
+    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>) {
         this.map = map;
         this.positionKeeper = positionKeeper;
         this.eventBuilder = eventBuilder;
@@ -18,7 +21,26 @@ export class ArtificialIntelligence {
         this.npcs = npcs;
     }
 
-    process() {
+    async process(tick: number) {
+
+        if (tick % 25 === 0) {
+            // Spawn a random other person every couple of ticks! aaaaagggh
+            const npcId = uuidv4();
+            const npcKey = Math.floor(Math.random() * 2147483647);
+            await this.positionKeeper.spawnEntityAtFreePosition(npcId);
+            const entity = {
+                key: npcKey,
+                position: this.positionKeeper.getEntityPosition(npcId),
+                texture: Math.floor(Math.random() * 75)
+            } as Entity;
+            this.npcs[npcId] = entity;
+
+            const players: PlayerId[] = Object.keys(this.connections);
+            this.positionKeeper.findJoinWitnesses(npcId, players, entityId => {
+                this.eventBuilder.pushJoinEvent(entityId, "", entity);
+            });
+        }
+
         // TODO: rather going through all - keep a wake up list
         // where we just pick the ones that are allowed to act on
         // this.tickCount instead of randomly choosing each turn

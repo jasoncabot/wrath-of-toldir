@@ -147,8 +147,8 @@ export class Map implements DurableObject {
         const start = new Date().getTime();
 
         // update game state
-        this.commandQueue.process(this.tickCount++);
-        this.ai.process();
+        await this.commandQueue.process(this.tickCount++);
+        await this.ai.process(this.tickCount);
 
         // emit events for affected clients
         for (const [playerId, player] of Object.entries(this.connections)) {
