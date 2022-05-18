@@ -1,15 +1,9 @@
 import { CharacterData, Direction } from "grid-engine";
-import { textureForEntity } from "../../assets/spritesheets/Sprites";
+import { textureForEntity, textureMap } from "../../assets/spritesheets/Sprites";
 import { Elevation, Entity } from "../../models/events";
 import { MainScene } from "../scenes";
+import FloatingHealthBar, { HealthDataSource } from "./floatingHealthBar";
 import Weapon from "./weapon";
-
-export interface WalkingAnimatable {
-  walkingState: "walk" | "stand" | "attack"
-  playWalkAnimation(direction: Direction);
-  playStandAnimation(direction: Direction);
-  playAttackAnimation(direction: Direction);
-}
 
 export const keyForElevation = (elevation: Elevation) => {
   switch (elevation) {
@@ -37,7 +31,7 @@ export const normalisedFacingDirection = (direction: Direction) => {
   }
 }
 
-export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implements WalkingAnimatable {
+export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
   identifier: string;
   gridEngineCharacterData: CharacterData;
   canAttack: boolean
@@ -46,8 +40,9 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   nameBadge: Phaser.GameObjects.Text;
   speechBubble: Phaser.GameObjects.Text;
   walkingState: "walk" | "stand" | "attack";
+  healthBar: FloatingHealthBar;
 
-  constructor(scene: MainScene, name: string, entity: Entity) {
+  constructor(scene: MainScene, name: string, entity: Entity, datasource: HealthDataSource) {
     super(scene, 0, 0, textureForEntity(entity.texture()), 0);
     this.identifier = entity.key().toString();
     this.name = name;
@@ -70,6 +65,8 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
     this.walkingState = "stand";
 
     scene.add.existing(this);
+
+    this.healthBar = new FloatingHealthBar(scene, this.getCenter().x, this.getCenter().y, datasource);
 
     this.nameBadge = scene.add.text(this.getCenter().x, this.getCenter().y, name, {
       color: '#fff',
@@ -96,11 +93,13 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
   }
 
   getStopFrame(direction: Direction): number {
+    const stopFrames = textureMap.get(this.texture.key)?.stand;
+    if (!stopFrames) return 0;
     switch (normalisedFacingDirection(direction)) {
-      case Direction.LEFT: return 43;
-      case Direction.UP: return 59;
-      case Direction.RIGHT: return 51;
-      case Direction.DOWN: return 35;
+      case Direction.LEFT: return stopFrames.left[stopFrames.left.length - 1];
+      case Direction.UP: return stopFrames.up[stopFrames.up.length - 1];
+      case Direction.RIGHT: return stopFrames.right[stopFrames.right.length - 1];
+      case Direction.DOWN: return stopFrames.down[stopFrames.down.length - 1];
     }
     return 0;
   }
@@ -159,11 +158,14 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite implem
 
     this.nameBadge.setPosition(this.getCenter().x, this.getBottomCenter().y).setDepth(this.depth + 1);
     if (this.speechBubble.visible) {
-      this.speechBubble.setPosition(this.getCenter().x, this.getTopCenter().y).setDepth(this.depth + 1);
+      this.speechBubble.setPosition(this.getCenter().x, this.getTopCenter().y).setDepth(this.depth + 2);
     }
+
+    this.healthBar.setPosition(this.getCenter().x, this.getTopCenter().y).setDepth(this.depth + 1);
   }
 
   destroy(fromScene?: boolean): void {
+    this.healthBar.destroy(fromScene);
     this.weaponSprite?.destroy(fromScene);
     this.nameBadge?.destroy(fromScene);
     this.speechBubble?.destroy(fromScene);

@@ -23,7 +23,7 @@ export class ArtificialIntelligence {
 
     async process(tick: number) {
 
-        if (tick % 25 === 0) {
+        if (tick % 100 === 0) {
             // Spawn a random other person every couple of ticks! aaaaagggh
             const npcId = uuidv4();
             const npcKey = Math.floor(Math.random() * 2147483647);

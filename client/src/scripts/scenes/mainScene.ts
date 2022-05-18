@@ -4,7 +4,7 @@ import { AnimatedSpriteDirectionalFrames, entityTextureNames, textureMap } from 
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
 import { Action, JoinCommand, MoveCommand, SpawnCommand, Vec2 } from '../../models/commands';
-import { AttackData, AttackEvent, DamageState, Elevation, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
+import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
 import { ChatCommand } from '../../models/wrath-of-toldir/commands/chat-command';
@@ -18,9 +18,9 @@ import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
 import ActionButton, { ActionButtonSelected, ActionButtonType } from "../objects/actionButton";
 import ChatDialog from '../objects/chatDialog';
+import { buildHealthDataSource } from "../objects/floatingHealthBar";
 import LabelledBar, { LabelledBarDataSource, LabelledBarType } from "../objects/labelledBar";
-import Monster from '../objects/monster';
-import { keyForElevation, normalisedFacingDirection, WalkingAnimatable } from '../objects/playerCharacter';
+import { keyForElevation, normalisedFacingDirection } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
 import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
 import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
@@ -57,7 +57,7 @@ export default class MainScene extends Phaser.Scene {
   map: Phaser.Tilemaps.Tilemap
   onPositionChangedSubscription: any;
   player: PlayerCharacter
-  playerCharacters: PlayerCharacter[];
+  entities: PlayerCharacter[];
   movementController: MovementController;
   collisionDisplayLayer: Phaser.Tilemaps.TilemapLayer;
 
@@ -72,7 +72,7 @@ export default class MainScene extends Phaser.Scene {
     super({ key: 'MainScene' });
 
     this.commandSequencer = 0;
-    this.playerCharacters = [];
+    this.entities = [];
   }
 
   preload() {
@@ -194,7 +194,7 @@ export default class MainScene extends Phaser.Scene {
       this.applyDefaultAction(direction, lookingAtPosition);
     }
 
-    this.playerCharacters.forEach(pc => pc.updateAttachedSprites());
+    this.entities.forEach(pc => pc.updateAttachedSprites());
   }
 
   private onTextEntered(text: string) {
@@ -340,14 +340,9 @@ export default class MainScene extends Phaser.Scene {
     if (this.currentState !== MapSceneState.READY) return;
 
     // TODO: if we are facing something interesting
-    // This is awful, we should just be able to go from position -> to all sprites by looking at our 
-    // sets of NPCs
-    const charId = this.gridEngine.getAllCharacters().map(id => {
-      return {
-        id: id, pos: this.gridEngine.getPosition(id)
-      }
-    }).find(x => x.pos.x === position.x && x.pos.y === position.y)?.id;
-    const targetKey = charId ? parseInt((this.gridEngine.getSprite(charId) as any).identifier, 10) : 0;
+    const playerLayer = this.gridEngine.getCharLayer(this.player.identifier);
+    const targetCharacterId = this.gridEngine.getCharactersAt(position, playerLayer)[0];
+    const target = targetCharacterId ? this.gridEngine.getSprite(targetCharacterId) as PlayerCharacter : { identifier: '0' };
 
     const type = [this.actionButton1, this.actionButton2, this.actionButton3].find(b => b.isSelected)!.actionType;
     switch (type) {
@@ -364,7 +359,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.player.canMagic = false;
         this.time.delayedCall(500, () => { this.player.canMagic = true });
-        this.submitMagic(targetKey, direction, position);
+        this.submitMagic(parseInt(target.identifier, 10) ?? 0, direction, position);
         break;
       }
       case ActionButtonType.Potion: {
@@ -394,10 +389,10 @@ export default class MainScene extends Phaser.Scene {
         case Update.JoinEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
-          const pc = new PlayerCharacter(this, join.name()!, join.entity()!);
+          const pc = new PlayerCharacter(this, join.name()!, join.entity()!, buildHealthDataSource(join.entity()!));
           this.gridEngine.addCharacter(pc.gridEngineCharacterData);
           pc.playStandAnimation(this.gridEngine.getFacingDirection(join.entity()!.key().toString()));
-          this.playerCharacters.push(pc);
+          this.entities.push(pc);
           break;
         }
         case Update.LeaveEvent: {
@@ -441,8 +436,13 @@ export default class MainScene extends Phaser.Scene {
         case Update.DamagedEvent: {
           const event: DamagedEvent = update.events(i, new DamagedEvent());
           const enemy = this.gridEngine.getSprite(event.key().toString());
-          const damage = this.add.text(enemy.getCenter().x, enemy.y, event.amount().toString(), {
-            color: '#ffffff',
+          const tint = enemy.tint;
+          enemy.tint = 0xAE2334;
+          const damage = this.add.text(
+            Phaser.Math.Between(enemy.getCenter().x - 4, enemy.getCenter().x + 4),
+            Phaser.Math.Between(enemy.getCenter().y - 4, enemy.getCenter().y + 4),
+            event.amount().toString(), {
+            color: '#EF3B3C',
             fontSize: '16px',
             fontFamily: "'Press Start 2P'"
           })
@@ -457,6 +457,7 @@ export default class MainScene extends Phaser.Scene {
             yoyo: false,
             callbackScope: this,
             onComplete: () => {
+              enemy.tint = tint;
               this.tweens.add({
                 targets: damage,
                 alpha: 0,
@@ -494,11 +495,7 @@ export default class MainScene extends Phaser.Scene {
 
     // Remove old sprites
     [this.map, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
-    this.playerCharacters.forEach(pc => pc.destroy());
-    this.children.list.filter(child => {
-      if (child instanceof Monster) return true;
-      return false;
-    }).forEach(x => x.destroy());
+    this.entities.forEach(pc => pc.destroy());
 
     // Create our connection to the server
     this.connection?.close(1000);
@@ -586,8 +583,8 @@ export default class MainScene extends Phaser.Scene {
     }
 
     this.debugText.prefix = `(${event.player()!.pos()!.x()},${event.player()!.pos()!.y()})`;
-    this.player = new PlayerCharacter(this, event.name()!, event.player()!);
-    this.playerCharacters.push(this.player);
+    this.player = new PlayerCharacter(this, event.name()!, event.player()!, buildHealthDataSource(event.player()!));
+    this.entities.push(this.player);
 
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
@@ -601,8 +598,8 @@ export default class MainScene extends Phaser.Scene {
 
     for (let i = 0; i < event.npcsLength(); i++) {
       const npc = event.npcs(i)!;
-      const enntityName = ""; // TODO: generate a funny name?
-      const sprite = new Monster(this, enntityName, npc);
+      const sprite = new PlayerCharacter(this, npc.texture().toString(), npc, buildHealthDataSource(npc));
+      this.entities.push(sprite);
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
     }
@@ -633,17 +630,17 @@ export default class MainScene extends Phaser.Scene {
     // Player Animations on movement
     this.player.playStandAnimation(this.gridEngine.getFacingDirection(this.player.identifier));
     this.gridEngine.movementStarted().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as unknown as WalkingAnimatable;
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
       sprite.playWalkAnimation(direction);
     });
 
     this.gridEngine.movementStopped().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as unknown as WalkingAnimatable;
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
       sprite.playStandAnimation(direction);
     });
 
     this.gridEngine.directionChanged().subscribe(({ charId, direction }) => {
-      const sprite = this.gridEngine.getSprite(charId) as unknown as WalkingAnimatable;
+      const sprite = this.gridEngine.getSprite(charId) as PlayerCharacter;
       sprite.playStandAnimation(direction);
     });
 

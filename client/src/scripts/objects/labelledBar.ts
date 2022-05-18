@@ -1,3 +1,4 @@
+import { Entity } from "../../models/events";
 import { MainScene } from "../scenes";
 
 export interface LabelledBarDataSource {
