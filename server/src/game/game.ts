@@ -54,3 +54,8 @@ export interface Entity {
     texture: EntityTexture
     position: Position
 }
+
+export interface Health {
+    current: number
+    max: number
+}

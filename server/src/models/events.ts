@@ -12,4 +12,5 @@ export { MapJoinedEvent } from './wrath-of-toldir/events/map-joined-event';
 export { MoveEvent } from './wrath-of-toldir/events/move-event';
 export { Update, unionToUpdate, unionListToUpdate } from './wrath-of-toldir/events/update';
 export { TileMap } from './wrath-of-toldir/maps/tile-map';
+export { PrivateStats } from './wrath-of-toldir/private-stats';
 export { Vec2 } from './wrath-of-toldir/vec2';

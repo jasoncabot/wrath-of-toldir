@@ -1,24 +1,27 @@
+import { SpawnResult } from "@/durable-objects/combat";
 import { Connection } from "@/durable-objects/map";
-import { Entity, EntityId, PlayerId, TiledJSON } from "../game";
-import { EventBuilder } from "./event-builder";
-import { Position, PositionKeeper } from "./position-keeper";
 import { v4 as uuidv4 } from 'uuid';
-import { Elevation } from "@/models/events";
-import { EntityTexture } from "@/models/commands";
+import { Entity, EntityId, Health, PlayerId, TiledJSON } from "../game";
+import { EventBuilder } from "./event-builder";
+import { PositionKeeper } from "./position-keeper";
 
 export class ArtificialIntelligence {
     npcs: Record<EntityId, Entity>;
+    healthRecords: Record<EntityId, Health>;
     connections: Record<PlayerId, Connection>;
     positionKeeper: PositionKeeper;
     eventBuilder: EventBuilder;
     map: TiledJSON;
+    combat: DurableObjectNamespace;
 
-    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>) {
+    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, healthRecords: Record<EntityId, Health>, combat: DurableObjectNamespace) {
         this.map = map;
         this.positionKeeper = positionKeeper;
         this.eventBuilder = eventBuilder;
         this.connections = connections;
         this.npcs = npcs;
+        this.healthRecords = healthRecords;
+        this.combat = combat;
     }
 
     async process(tick: number) {
@@ -35,9 +38,20 @@ export class ArtificialIntelligence {
             } as Entity;
             this.npcs[npcId] = entity;
 
+            const npcCombatStatsId = this.combat.idFromName(npcId);
+            const npcCombatStats = this.combat.get(npcCombatStatsId);
+            const stats: SpawnResult = await npcCombatStats.fetch(`http://combat/?action=spawn`, {
+                method: 'POST'
+            }).then(spawn => spawn.json() as unknown as SpawnResult);
+            const health = {
+                current: stats.hp,
+                max: stats.hp
+            };
+            this.healthRecords[npcId] = health;
+
             const players: PlayerId[] = Object.keys(this.connections);
             this.positionKeeper.findJoinWitnesses(npcId, players, entityId => {
-                this.eventBuilder.pushJoinEvent(entityId, "", entity);
+                this.eventBuilder.pushJoinEvent(entityId, "", entity, health);
             });
         }
 

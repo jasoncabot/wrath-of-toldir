@@ -38,6 +38,7 @@ union Action {
 
 table Command {
     seq: uint;
+    ts: uint;
     action: Action;
 }
 

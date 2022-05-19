@@ -2,7 +2,7 @@ import { CharacterData, Direction } from "grid-engine";
 import { textureForEntity, textureMap } from "../../assets/spritesheets/Sprites";
 import { Elevation, Entity } from "../../models/events";
 import { MainScene } from "../scenes";
-import FloatingHealthBar, { HealthDataSource } from "./floatingHealthBar";
+import FloatingHealthBar from "./floatingHealthBar";
 import Weapon from "./weapon";
 
 export const keyForElevation = (elevation: Elevation) => {
@@ -42,7 +42,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
   walkingState: "walk" | "stand" | "attack";
   healthBar: FloatingHealthBar;
 
-  constructor(scene: MainScene, name: string, entity: Entity, datasource: HealthDataSource) {
+  constructor(scene: MainScene, name: string, entity: Entity) {
     super(scene, 0, 0, textureForEntity(entity.texture()), 0);
     this.identifier = entity.key().toString();
     this.name = name;
@@ -66,7 +66,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
 
     scene.add.existing(this);
 
-    this.healthBar = new FloatingHealthBar(scene, this.getCenter().x, this.getCenter().y, datasource);
+    this.healthBar = new FloatingHealthBar(scene, this.getCenter().x, this.getCenter().y, entity.hp()!, entity.maxHp()!);
 
     this.nameBadge = scene.add.text(this.getCenter().x, this.getCenter().y, name, {
       color: '#fff',
@@ -87,9 +87,71 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
     this.speechBubble.text = message;
     // TODO: animation here
     this.speechBubble.visible = true;
-    setTimeout(() => {
+    this.scene.time.delayedCall(1000, () => {
       this.speechBubble.visible = false;
-    }, 1000);
+    });
+  }
+
+  addDamage(amount: number, health: number) {
+    this.healthBar.setHealth(health);
+    const tint = this.tint;
+    this.tint = 0xAE2334;
+
+    const damage = this.scene.add.text(
+      Phaser.Math.Between(this.getCenter().x - 4, this.getCenter().x + 4),
+      Phaser.Math.Between(this.getCenter().y - 4, this.getCenter().y + 4),
+      amount.toString(), {
+      color: '#EF3B3C',
+      fontSize: '16px',
+      fontFamily: "'Press Start 2P'"
+    }).setDepth(this.depth + 1)
+      .setOrigin(0.5, 1);
+
+    const tweens = this.scene.tweens;
+
+    tweens.add({
+      targets: damage,
+      y: damage.y - 10,
+      ease: "Sine.easeOut",
+      duration: 250,
+      yoyo: false,
+      callbackScope: this,
+      onComplete: () => {
+        this.tint = tint;
+        tweens.add({
+          targets: damage,
+          alpha: 0,
+          ease: "Sine.easeOut",
+          duration: 500,
+          yoyo: false,
+          callbackScope: this,
+          onComplete: () => {
+            damage.destroy();
+          }
+        });
+      }
+    });
+    return damage;
+  }
+
+  explode() {
+    const emitter = this.scene.add.particles('blood').createEmitter({
+      x: this.getCenter().x,
+      y: this.getCenter().y,
+      speed: { min: -800, max: 800 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.3, end: 0 },
+      blendMode: Phaser.BlendModes.MULTIPLY,
+      lifespan: 120,
+      gravityY: 800
+    });
+    emitter.manager.setDepth(this.depth + 1);
+    (this.scene as MainScene).interfaceCamera.ignore(emitter.manager);
+
+    this.scene.time.delayedCall(750, () => {
+      emitter.remove();
+      this.destroy();
+    });
   }
 
   getStopFrame(direction: Direction): number {

@@ -18,7 +18,6 @@ import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
 import ActionButton, { ActionButtonSelected, ActionButtonType } from "../objects/actionButton";
 import ChatDialog from '../objects/chatDialog';
-import { buildHealthDataSource } from "../objects/floatingHealthBar";
 import LabelledBar, { LabelledBarDataSource, LabelledBarType } from "../objects/labelledBar";
 import { keyForElevation, normalisedFacingDirection } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
@@ -67,6 +66,7 @@ export default class MainScene extends Phaser.Scene {
   healthBar: LabelledBar;
   magicBar: LabelledBar;
   experienceBar: LabelledBar;
+  hudDataSource: LabelledBarDataSource;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -116,7 +116,7 @@ export default class MainScene extends Phaser.Scene {
     this.interfaceCamera = this.cameras.add();
     this.input.addPointer(3); // support multitouch
 
-    this.debugText = new DebugText(this);
+    this.debugText = new DebugText(this).setVisible(false);
     const hud = this.add.image(0, 0, 'hud').setOrigin(0, 0);
     this.cameras.main.ignore(hud);
 
@@ -135,23 +135,15 @@ export default class MainScene extends Phaser.Scene {
     this.actionButton3 = new ActionButton(this, 523, 567, ActionButtonType.Potion).setSelected(false).on(ActionButtonSelected, () => onActionButtonSelected(2));
 
     const ds: LabelledBarDataSource = {
-      health: { current: 50, max: 50 },
-      magic: { current: 20, max: 20 },
-      experience: { current: 210, max: 1000, level: 1 },
+      health: { current: 0, max: 0 },
+      magic: { current: 0, max: 0 },
+      experience: { current: 0, max: 0, level: 0 },
     };
+    this.hudDataSource = ds;
 
     this.healthBar = new LabelledBar(this, 12, 504, LabelledBarType.Health, ds);
     this.magicBar = new LabelledBar(this, 12, 525, LabelledBarType.Magic, ds);
     this.experienceBar = new LabelledBar(this, 12, 546, LabelledBarType.Experience, ds);
-
-    // TODO: remove this
-    ds.health.current = Math.ceil(Math.random() * ds.health.max);
-    ds.magic.current = Math.ceil(Math.random() * ds.magic.max);
-    ds.experience.current = Math.ceil(Math.random() * ds.experience.max);
-    this.healthBar.onDataSourceUpdated(ds);
-    this.magicBar.onDataSourceUpdated(ds);
-    this.experienceBar.onDataSourceUpdated(ds);
-    // TODO: end remove this
 
     this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
 
@@ -233,6 +225,7 @@ export default class MainScene extends Phaser.Scene {
       const spawn = SpawnCommand.endSpawnCommand(builder);
       Command.startCommand(builder);
       Command.addSeq(builder, ++this.commandSequencer);
+      Command.addTs(builder, new Date().getUTCMilliseconds());
       Command.addActionType(builder, Action.SpawnCommand);
       Command.addAction(builder, spawn);
       const update = Command.endCommand(builder);
@@ -245,6 +238,7 @@ export default class MainScene extends Phaser.Scene {
       const chat = ChatCommand.createChatCommand(builder, messageOffset);
       Command.startCommand(builder);
       Command.addSeq(builder, ++this.commandSequencer);
+      Command.addTs(builder, new Date().getUTCMilliseconds());
       Command.addActionType(builder, Action.ChatCommand);
       Command.addAction(builder, chat);
       const update = Command.endCommand(builder);
@@ -272,6 +266,7 @@ export default class MainScene extends Phaser.Scene {
 
       Command.startCommand(builder);
       Command.addSeq(builder, ++this.commandSequencer);
+      Command.addTs(builder, new Date().getUTCMilliseconds());
       Command.addActionType(builder, Action.JoinCommand);
       Command.addAction(builder, join);
       const update = Command.endCommand(builder);
@@ -309,6 +304,7 @@ export default class MainScene extends Phaser.Scene {
     const attack = AttackCommand.createAttackCommand(builder, AttackData.MagicAttack, magicAttackOffset);
     Command.startCommand(builder);
     Command.addSeq(builder, ++this.commandSequencer);
+    Command.addTs(builder, new Date().getUTCMilliseconds());
     Command.addActionType(builder, Action.AttackCommand);
     Command.addAction(builder, attack);
     const update = Command.endCommand(builder);
@@ -329,6 +325,7 @@ export default class MainScene extends Phaser.Scene {
       NormalAttack.createNormalAttack(builder, Directions.indexOf(facing)));
     Command.startCommand(builder);
     Command.addSeq(builder, ++this.commandSequencer);
+    Command.addTs(builder, new Date().getUTCMilliseconds());
     Command.addActionType(builder, Action.AttackCommand);
     Command.addAction(builder, attack);
     const update = Command.endCommand(builder);
@@ -389,7 +386,7 @@ export default class MainScene extends Phaser.Scene {
         case Update.JoinEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
-          const pc = new PlayerCharacter(this, join.name()!, join.entity()!, buildHealthDataSource(join.entity()!));
+          const pc = new PlayerCharacter(this, join.name()!, join.entity()!);
           this.gridEngine.addCharacter(pc.gridEngineCharacterData);
           pc.playStandAnimation(this.gridEngine.getFacingDirection(join.entity()!.key().toString()));
           this.entities.push(pc);
@@ -435,44 +432,11 @@ export default class MainScene extends Phaser.Scene {
         }
         case Update.DamagedEvent: {
           const event: DamagedEvent = update.events(i, new DamagedEvent());
-          const enemy = this.gridEngine.getSprite(event.key().toString());
-          const tint = enemy.tint;
-          enemy.tint = 0xAE2334;
-          const damage = this.add.text(
-            Phaser.Math.Between(enemy.getCenter().x - 4, enemy.getCenter().x + 4),
-            Phaser.Math.Between(enemy.getCenter().y - 4, enemy.getCenter().y + 4),
-            event.amount().toString(), {
-            color: '#EF3B3C',
-            fontSize: '16px',
-            fontFamily: "'Press Start 2P'"
-          })
-            .setDepth(Math.max(this.player.depth, enemy.depth) + 1)
-            .setOrigin(0.5, 1);
-          this.interfaceCamera.ignore(damage);
-          this.tweens.add({
-            targets: damage,
-            y: damage.y - 10,
-            ease: "Sine.easeOut",
-            duration: 250,
-            yoyo: false,
-            callbackScope: this,
-            onComplete: () => {
-              enemy.tint = tint;
-              this.tweens.add({
-                targets: damage,
-                alpha: 0,
-                ease: "Sine.easeOut",
-                duration: 500,
-                yoyo: false,
-                callbackScope: this,
-                onComplete: () => {
-                  damage.destroy();
-                }
-              });
-            }
-          });
+          const enemy = this.gridEngine.getSprite(event.key().toString()) as PlayerCharacter;
+          const damageSprite = enemy.addDamage(event.amount()!, event.hp()!);
+          this.interfaceCamera.ignore(damageSprite);
           if (event.state() == DamageState.Dead) {
-            enemy.destroy();
+            enemy.explode();
             this.gridEngine.removeCharacter(event.key().toString());
           }
           break;
@@ -495,7 +459,7 @@ export default class MainScene extends Phaser.Scene {
 
     // Remove old sprites
     [this.map, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
-    this.entities.forEach(pc => pc.destroy());
+    this.entities.forEach(entity => entity.destroy());
 
     // Create our connection to the server
     this.connection?.close(1000);
@@ -583,8 +547,17 @@ export default class MainScene extends Phaser.Scene {
     }
 
     this.debugText.prefix = `(${event.player()!.pos()!.x()},${event.player()!.pos()!.y()})`;
-    this.player = new PlayerCharacter(this, event.name()!, event.player()!, buildHealthDataSource(event.player()!));
+    this.player = new PlayerCharacter(this, event.name()!, event.player()!);
     this.entities.push(this.player);
+
+    this.hudDataSource.health.current = event.player()!.hp()!;
+    this.hudDataSource.health.max = event.player()!.maxHp()!;
+    this.hudDataSource.magic.current = event.stats()!.mp()!;
+    this.hudDataSource.magic.max = event.stats()!.maxMp()!;
+    this.hudDataSource.experience.current = event.stats()!.exp()!;
+    this.hudDataSource.experience.max = event.stats()!.maxExp()!;
+    this.hudDataSource.experience.level = event.stats()!.level()!;
+    [this.healthBar, this.magicBar, this.experienceBar].forEach(bar => bar.onDataSourceUpdated(this.hudDataSource));
 
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
@@ -598,7 +571,7 @@ export default class MainScene extends Phaser.Scene {
 
     for (let i = 0; i < event.npcsLength(); i++) {
       const npc = event.npcs(i)!;
-      const sprite = new PlayerCharacter(this, npc.texture().toString(), npc, buildHealthDataSource(npc));
+      const sprite = new PlayerCharacter(this, npc.texture().toString(), npc);
       this.entities.push(sprite);
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
@@ -620,6 +593,7 @@ export default class MainScene extends Phaser.Scene {
 
       Command.startCommand(builder);
       Command.addSeq(builder, ++this.commandSequencer);
+      Command.addTs(builder, new Date().getUTCMilliseconds());
       Command.addActionType(builder, Action.MoveCommand);
       Command.addAction(builder, movement);
       const update = Command.endCommand(builder);

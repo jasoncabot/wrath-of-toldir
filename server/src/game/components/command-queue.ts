@@ -1,14 +1,14 @@
-import { AttackResult } from "@/durable-objects/combat";
+import { AttackResult, SpawnResult } from "@/durable-objects/combat";
 import { Connection } from "@/durable-objects/map";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
 import { Action, AttackCommand, AttackData, ChatCommand, EntityTexture, JoinCommand, MoveCommand, SpawnCommand } from "@/models/commands";
+import { Elevation } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
-import { Entity, EntityId, MapTransition, PlayerId, ReceivedCommand, TiledJSON } from "../game";
+import { v4 as uuidv4 } from 'uuid';
+import { Entity, EntityId, Health, MapTransition, PlayerId, ReceivedCommand, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
 import { Position, PositionKeeper } from "./position-keeper";
-import { v4 as uuidv4 } from 'uuid';
-import { Elevation } from "@/models/events";
 
 export type CharacterDetailLookup = (playerId: PlayerId, characterId: PlayerId) => Promise<{ name: string, texture: EntityTexture }>;
 
@@ -19,16 +19,18 @@ export class CommandQueue {
     private positionKeeper: PositionKeeper;
     private eventBuilder: EventBuilder;
     private npcs: Record<EntityId, Entity>;
+    private healthRecords: Record<EntityId, Health>;
     private combat: DurableObjectNamespace;
 
     // TODO: This is horrid - still need to think about how to structure this and what it's responsibilities are
-    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, combat: DurableObjectNamespace) {
+    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, healthRecords: Record<EntityId, Health>, combat: DurableObjectNamespace) {
         this.commands = [];
         this.map = map;
         this.positionKeeper = positionKeeper;
         this.eventBuilder = eventBuilder;
         this.connections = connections;
         this.npcs = npcs;
+        this.healthRecords = healthRecords;
         this.combat = combat;
     }
 
@@ -104,13 +106,25 @@ export class CommandQueue {
                     await this.positionKeeper.spawnEntityAtFreePosition(entityId);
                     const character = this.connections[entityId].character;
 
+                    // add character to our health records and the combat map
+                    const npcCombatStatsId = this.combat.idFromName(entityId);
+                    const npcCombatStats = this.combat.get(npcCombatStatsId);
+                    const stats: SpawnResult = await npcCombatStats.fetch(`http://combat/?action=spawn`, {
+                        method: 'POST'
+                    }).then(spawn => spawn.json() as unknown as SpawnResult);
+                    const health = {
+                        current: stats.hp,
+                        max: stats.hp
+                    };
+                    this.healthRecords[entityId] = health;
+
                     // inform other players
                     const playerData: Entity = {
                         key: publicCharId,
                         position: this.positionKeeper.getEntityPosition(entityId),
                         texture: character.texture
                     };
-                    this.eventBuilder.pushCurrentMapState(entityId, character.name, playerData, this.map, this.npcs, this.positionKeeper);
+                    this.eventBuilder.pushCurrentMapState(entityId, character.name, playerData, this.map, this.npcs, this.healthRecords, this.positionKeeper);
                     this.positionKeeper.findJoinWitnesses(entityId, players, async otherPlayerId => {
                         // tell the player who joined about other players who are already here
                         const otherPublicCharacterId = this.connections[otherPlayerId].publicCharacterId;
@@ -121,10 +135,12 @@ export class CommandQueue {
                                 position: this.positionKeeper.getEntityPosition(otherPlayerId),
                                 texture: otherCharacter.texture
                             };
-                            this.eventBuilder.pushJoinEvent(entityId, otherCharacter.name, otherPlayerData);
+                            // push to the player who joined
+                            this.eventBuilder.pushJoinEvent(entityId, otherCharacter.name, otherPlayerData, this.healthRecords[otherPlayerId]);
                         }
 
-                        this.eventBuilder.pushJoinEvent(otherPlayerId, character.name, playerData);
+                        // push to other players that we joined
+                        this.eventBuilder.pushJoinEvent(otherPlayerId, character.name, playerData, health);
                     });
                     break;
                 }
@@ -153,6 +169,7 @@ export class CommandQueue {
                     // check if anything died
                     damages.forEach(attack => {
                         if (attack.state == DamageState.Dead) {
+                            this.positionKeeper.removeEntity(attack.targetId);
                             delete this.npcs[attack.targetId];
                             // TODO: finish destroying this NPC
                             // increase experience
@@ -161,13 +178,13 @@ export class CommandQueue {
                     });
 
                     // inform other players
-                    damages.forEach(({ key, damage, state }) => {
-                        this.eventBuilder.pushDamagedEvent(entityId, key, damage, state);
+                    damages.forEach(({ key, damage, remaining, state }) => {
+                        this.eventBuilder.pushDamagedEvent(entityId, key, damage, remaining, state);
                     });
                     this.positionKeeper.findAttackWitnesses(entityId, players, (otherPlayerId) => {
                         this.eventBuilder.pushAttackEvent(otherPlayerId, publicCharacterId!, attack);
-                        damages.forEach(({ key, damage, state }) => {
-                            this.eventBuilder.pushDamagedEvent(otherPlayerId, key, damage, state);
+                        damages.forEach(({ key, damage, remaining, state }) => {
+                            this.eventBuilder.pushDamagedEvent(otherPlayerId, key, damage, remaining, state);
                         });
                     });
 
@@ -209,9 +226,21 @@ export class CommandQueue {
 
                     this.positionKeeper.spawnEntityAt(npcId, position);
 
+                    // add character to our health records and the combat map
+                    const npcCombatStatsId = this.combat.idFromName(npcId);
+                    const npcCombatStats = this.combat.get(npcCombatStatsId);
+                    const stats: SpawnResult = await npcCombatStats.fetch(`http://combat/?action=spawn`, {
+                        method: 'POST'
+                    }).then(spawn => spawn.json() as unknown as SpawnResult);
+                    const health = {
+                        current: stats.hp,
+                        max: stats.hp
+                    };
+                    this.healthRecords[npcId] = health;
+
                     // inform other players
                     players.forEach(otherPlayerId => {
-                        this.eventBuilder.pushJoinEvent(otherPlayerId, "", entity);
+                        this.eventBuilder.pushJoinEvent(otherPlayerId, "", entity, health);
                     });
                 }
             }
@@ -237,7 +266,7 @@ export class CommandQueue {
         }
 
         const targetEntityIds = this.positionKeeper.getEntitiesAtPosition(facingPosition, true);
-        let damages: { attackerId: EntityId, targetId: EntityId, key: number, damage: number, state: DamageState }[] = [];
+        let damages: { attackerId: EntityId, targetId: EntityId, key: number, damage: number, remaining: number, state: DamageState }[] = [];
         if (targetEntityIds.size > 0) {
             const playerIdCombat = this.combat.idFromName(playerId);
             const stub = this.combat.get(playerIdCombat);
@@ -245,7 +274,7 @@ export class CommandQueue {
                 method: 'POST',
                 body: JSON.stringify({ targets: Array.from(targetEntityIds.values()) })
             }).then(attack => attack.json() as unknown as AttackResult[]);
-            result.forEach(({ entityId, damage, state }) => {
+            result.forEach(({ entityId, damage, hp, state }) => {
                 const npc = this.npcs[entityId];
                 if (!npc) return;
                 damages.push({
@@ -253,6 +282,7 @@ export class CommandQueue {
                     targetId: entityId,
                     key: npc.key,
                     damage,
+                    remaining: hp,
                     state
                 });
             });

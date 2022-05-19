@@ -22,7 +22,7 @@ export class MovementController extends Phaser.GameObjects.Image {
     private pointer1Down: boolean;
 
     constructor(scene: MainScene, plugin: PlayerMovementPlugin) {
-        super(scene, 0, 0, 'joystick-base');
+        super(scene, 0, 0, 'joystick_base');
 
         this.setPointerCount(0, { x: 0, y: 0 });
 
@@ -144,10 +144,18 @@ export class MovementController extends Phaser.GameObjects.Image {
             this.setRotation(Phaser.Math.Angle.BetweenPoints(this.getCenter(), this.scene.input.pointer1) + PI_2);
 
             const movementThreshold = 4000;
-            if (Phaser.Math.Distance.BetweenPointsSquared(this.getCenter(), this.scene.input.pointer1) > movementThreshold) {
+            const actionThreshold = 1200;
+            const distanceDragged = Phaser.Math.Distance.BetweenPointsSquared(this.getCenter(), this.scene.input.pointer1);
+            if (distanceDragged > movementThreshold) {
                 this.setVisible(true);
                 this.direction = this.directionBetween(this.getCenter(), this.scene.input.pointer1);
                 this.fireDefaultAction = false;
+            } else if (distanceDragged > actionThreshold) {
+                // the player has dragged a little bit, but not enough to trigger movement
+                // this should trigger an action in the direction that we dragged rather than an
+                // action from where the player tapped relative to the player
+                this.shouldMove = false;
+                this.direction = this.directionBetween(this.getCenter(), { x: this.scene.input.pointer1.worldX, y: this.scene.input.pointer1.worldY });
             } else {
                 this.shouldMove = false;
                 this.direction = this.directionBetween(player.getCenter(), { x: this.scene.input.pointer1.worldX, y: this.scene.input.pointer1.worldY });

@@ -4,6 +4,7 @@ import * as flatbuffers from 'flatbuffers';
 
 import { Entity } from '../../wrath-of-toldir/entity';
 import { TileMap } from '../../wrath-of-toldir/maps/tile-map';
+import { PrivateStats } from '../../wrath-of-toldir/private-stats';
 
 
 export class MapJoinedEvent {
@@ -51,8 +52,13 @@ npcsLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
+stats(obj?:PrivateStats):PrivateStats|null {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? (obj || new PrivateStats()).__init(this.bb_pos + offset, this.bb!) : null;
+}
+
 static startMapJoinedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 }
 
 static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
@@ -81,6 +87,10 @@ static createNpcsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):
 
 static startNpcsVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
+}
+
+static addStats(builder:flatbuffers.Builder, statsOffset:flatbuffers.Offset) {
+  builder.addFieldStruct(4, statsOffset, 0);
 }
 
 static endMapJoinedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

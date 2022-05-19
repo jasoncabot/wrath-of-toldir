@@ -38,7 +38,7 @@ tag = "v3"
 new_classes = ["Character"]
 
 [vars]
-FRONTEND_URI="http://192.168.1.40:8080"
+FRONTEND_URI="http://0.0.0.0:8080"
 
 [env.production]
 name = "wrath-of-toldir-server"

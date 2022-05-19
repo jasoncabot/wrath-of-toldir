@@ -98,6 +98,16 @@ export class PositionKeeper {
         delete this.positions[id];
     }
 
+    removeEntity(id: EntityId) {
+        if (this.positions[id]) {
+            const oldKey = this.toKey(this.positions[id].x, this.positions[id].y);
+            this.positionIndex[oldKey][this.positions[id].z].delete(id);
+
+            delete this.positions[id];
+        }
+        this.storage.delete(storageKey(id));
+    }
+
     setEntityPosition(id: EntityId, position: Position) {
         if (this.positions[id]) {
             // we are going to assume this all exists as it should have been set after

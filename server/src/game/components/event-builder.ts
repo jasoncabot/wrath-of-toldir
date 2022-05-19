@@ -5,8 +5,9 @@ import { MapLayer, TileCollision, TileSet } from "@/models/maps";
 import { ChatEvent } from "@/models/wrath-of-toldir/events/chat-event";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
+import { PrivateStats } from "@/models/wrath-of-toldir/private-stats";
 import { Builder } from "flatbuffers";
-import { EntityId, Entity, PlayerId, TiledJSON } from "../game";
+import { EntityId, Entity, PlayerId, TiledJSON, Health } from "../game";
 import { Position, PositionKeeper } from "./position-keeper";
 
 type Effects = { builder: Builder, eventOffsets: number[], eventTypeOffsets: number[] };
@@ -64,7 +65,7 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.MoveEvent);
     }
 
-    pushJoinEvent(playerId: PlayerId, name: string, other: Entity) {
+    pushJoinEvent(playerId: PlayerId, name: string, other: Entity, health: Health) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         const otherPlayerName = builder.createString(name);
@@ -74,6 +75,8 @@ export class EventBuilder {
         EntityEvent.addKey(builder, other.key);
         EntityEvent.addPos(builder, Vec2.createVec2(builder, other.position.x, other.position.y));
         EntityEvent.addTexture(builder, other.texture);
+        EntityEvent.addHp(builder, health.current);
+        EntityEvent.addMaxHp(builder, health.max);
         const entityOffset = EntityEvent.endEntity(builder);
 
         JoinEvent.startJoinEvent(builder);
@@ -83,7 +86,7 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.JoinEvent);
     }
 
-    pushCurrentMapState(playerId: PlayerId, playerName: string, playerData: Entity, mapData: TiledJSON, npcs: Record<EntityId, Entity>, positionKeeper: PositionKeeper) {
+    pushCurrentMapState(playerId: PlayerId, playerName: string, playerData: Entity, mapData: TiledJSON, npcs: Record<EntityId, Entity>, healthRecords: Record<EntityId, Health>, positionKeeper: PositionKeeper) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         // TODO: can we load the (static) map data earlier and just merge the byte buffer here
@@ -106,6 +109,11 @@ export class EventBuilder {
 
         const npcOffsets = Object.keys(npcs).map(npcId => {
             const npc = npcs[npcId];
+            const hp = healthRecords[npcId];
+            if (!hp) {
+                debugger
+                throw new Error(`failed to read HP (npcs: ${Object.keys(npcs).length}, hp: ${Object.keys(healthRecords).length})`);
+            }
             const pos = positionKeeper.getEntityPosition(npcId);
 
             EntityEvent.startEntity(builder);
@@ -113,6 +121,8 @@ export class EventBuilder {
             EntityEvent.addKey(builder, npc.key);
             EntityEvent.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y));
             EntityEvent.addTexture(builder, npc.texture);
+            EntityEvent.addHp(builder, hp.current);
+            EntityEvent.addMaxHp(builder, hp.max);
             return EntityEvent.endEntity(builder);
         })
         const npcsVectorOffset = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
@@ -122,6 +132,8 @@ export class EventBuilder {
         EntityEvent.addKey(builder, playerData.key);
         EntityEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
         EntityEvent.addTexture(builder, playerData.texture);
+        EntityEvent.addHp(builder, healthRecords[playerId].current);
+        EntityEvent.addMaxHp(builder, healthRecords[playerId].max);
         const playerOffset = EntityEvent.endEntity(builder);
 
         const nameOffset = builder.createString(playerName);
@@ -130,6 +142,7 @@ export class EventBuilder {
         MapJoinedEvent.addNpcs(builder, npcsVectorOffset);
         MapJoinedEvent.addPlayer(builder, playerOffset);
         MapJoinedEvent.addTilemap(builder, tilemapOffset);
+        MapJoinedEvent.addStats(builder, PrivateStats.createPrivateStats(builder, 100, 100, 0, 1000, 1)); // TODO-HP
 
         eventOffsets.push(MapJoinedEvent.endMapJoinedEvent(builder));
         eventTypeOffsets.push(Update.MapJoinedEvent);
@@ -156,10 +169,10 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.LeaveEvent);
     }
 
-    pushDamagedEvent(playerId: PlayerId, key: number, damage: number, state: DamageState) {
+    pushDamagedEvent(playerId: PlayerId, key: number, damage: number, hp: number, state: DamageState) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
-        const damagedEventOffset = DamagedEvent.createDamagedEvent(builder, key, damage, state);
+        const damagedEventOffset = DamagedEvent.createDamagedEvent(builder, key, damage, hp, state);
 
         eventOffsets.push(damagedEventOffset);
         eventTypeOffsets.push(Update.DamagedEvent);

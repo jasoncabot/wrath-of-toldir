@@ -45,8 +45,18 @@ charLayer():Elevation {
   return offset ? this.bb!.readInt8(this.bb_pos + offset) : Elevation.Unknown;
 }
 
+hp():number {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+}
+
+maxHp():number {
+  const offset = this.bb!.__offset(this.bb_pos, 14);
+  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+}
+
 static startEntity(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(6);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -63,6 +73,14 @@ static addPos(builder:flatbuffers.Builder, posOffset:flatbuffers.Offset) {
 
 static addCharLayer(builder:flatbuffers.Builder, charLayer:Elevation) {
   builder.addFieldInt8(3, charLayer, Elevation.Unknown);
+}
+
+static addHp(builder:flatbuffers.Builder, hp:number) {
+  builder.addFieldInt32(4, hp, 0);
+}
+
+static addMaxHp(builder:flatbuffers.Builder, maxHp:number) {
+  builder.addFieldInt32(5, maxHp, 0);
 }
 
 static endEntity(builder:flatbuffers.Builder):flatbuffers.Offset {

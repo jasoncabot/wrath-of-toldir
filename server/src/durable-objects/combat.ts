@@ -16,6 +16,7 @@ interface CombatAttack {
 export interface AttackResult {
     entityId: string
     damage: number
+    hp: number
     state: DamageState
 }
 
@@ -36,10 +37,6 @@ export class Combat implements DurableObject {
                 this.state.storage.get("defence"),
                 this.state.storage.get("attack")]);
 
-            if (!hp) {
-                this.onEntitySpawned();
-                return;
-            }
             this.stats = { hp, defence, attack } as BaseStats;
         })
     }
@@ -51,8 +48,10 @@ export class Combat implements DurableObject {
 
         switch (action) {
             case "spawn": {
-                this.onEntitySpawned();
-                const result = { hp: this.stats.hp };
+                if (!this.stats.hp || this.stats.hp == 0) {
+                    this.onEntitySpawned();
+                }
+                const result: SpawnResult = { hp: this.stats.hp };
                 return new Response(JSON.stringify(result), { status: 201 });
             }
             case "attack": {
@@ -72,10 +71,11 @@ export class Combat implements DurableObject {
                 const entityId = searchParams.get('id');
                 const attacker = (await request.json()) as BaseStats;
                 const damage = Math.ceil((attacker.attack * attacker.attack) / (attacker.attack + this.stats.defence));
-                const result = { entityId, damage, state: DamageState.Default } as AttackResult;
 
-                this.stats.hp = this.stats.hp - damage;
-                if (this.stats.hp <= 0) {
+                this.stats.hp = Math.max(0, this.stats.hp - damage); // Health can't drop below 0
+                const result = { entityId, damage, hp: this.stats.hp, state: DamageState.Default } as AttackResult;
+
+                if (this.stats.hp === 0) {
                     result.state = DamageState.Dead;
                     this.onEntityDestroyed();
                 } else {

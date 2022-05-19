@@ -85,4 +85,15 @@ table Entity {
     texture: EntityTexture;
     pos: Vec2;
     char_layer: Elevation;
+    // these go in entity because they are public
+    hp: uint32;
+    max_hp: uint32;
+}
+
+struct PrivateStats {
+    mp: uint32;
+    max_mp: uint32;
+    exp: uint32;
+    max_exp: uint32;
+    level: byte;
 }

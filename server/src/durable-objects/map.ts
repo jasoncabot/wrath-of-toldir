@@ -3,7 +3,7 @@ import { ArtificialIntelligence } from "@/game/components/artificial-intelligenc
 import { CommandQueue } from "@/game/components/command-queue";
 import { EventBuilder } from "@/game/components/event-builder";
 import { Position, PositionKeeper } from "@/game/components/position-keeper";
-import { Entity, EntityId, PlayerId, TiledJSON } from "@/game/game";
+import { Entity, EntityId, Health, PlayerId, TiledJSON } from "@/game/game";
 import { Action, LeaveCommand } from "@/models/commands";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Builder, ByteBuffer } from "flatbuffers";
@@ -28,6 +28,7 @@ export class Map implements DurableObject {
     mapData: TiledJSON | undefined;
     tickCount: number = 0;
     npcs: Record<EntityId, Entity>;
+    healthRecords: Record<EntityId, Health>;
     positionKeeper: PositionKeeper;
     eventBuilder: EventBuilder;
     ai!: ArtificialIntelligence;
@@ -42,6 +43,7 @@ export class Map implements DurableObject {
         this.npcs = {};
         this.eventBuilder = new EventBuilder();
         this.positionKeeper = new PositionKeeper(this.state.storage, this.env.MAP, this.env.CHARACTER);
+        this.healthRecords = {};
     }
 
     initialiseMap(mapId: string) {
@@ -49,8 +51,8 @@ export class Map implements DurableObject {
         this.mapData = loadMapData(mapId);
         // TODO: slice and dice these dependencies a bit better, perhaps put them in a context
         this.positionKeeper.updateWithMap(this.mapData);
-        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.env.COMBAT);
-        this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs);
+        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT);
+        this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT);
     }
 
     async fetch(request: Request) {
@@ -236,10 +238,10 @@ export class Map implements DurableObject {
             // use this to inform other players we've left, using the LeaveCommand/LeaveEvent methodology
             const leaveBuilder = new Builder(32);
             const actionOffset = LeaveCommand.createLeaveCommand(leaveBuilder);
-            const commandOffset = Command.createCommand(leaveBuilder, 0, Action.LeaveCommand, actionOffset);
+            const commandOffset = Command.createCommand(leaveBuilder, 0, 0, Action.LeaveCommand, actionOffset);
             leaveBuilder.finish(commandOffset);
-            this.commandQueue.push(characterId, Command.getRootAsCommand(leaveBuilder.dataBuffer()));
             connection.quitting = true;
+            this.commandQueue.push(characterId, Command.getRootAsCommand(leaveBuilder.dataBuffer()));
         };
         socket.addEventListener("close", closeOrErrorHandler);
         socket.addEventListener("error", closeOrErrorHandler);

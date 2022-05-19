@@ -26,7 +26,9 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.spritesheet('sword', 'assets/spritesheets/Sprites/Weapons/sword-01.png', { frameWidth: 144, frameHeight: 144 });
 
     this.load.image('hud', 'assets/img/hud.png');
-    this.load.image('joystick-base', 'assets/img/joystick/base.png');
+    this.load.image('joystick_base', 'assets/img/joystick/base.png');
+    this.load.image('floating_hp', 'assets/img/floating_hp.png');
+    this.load.image('blood', 'assets/img/red.png');    
 
     this.load.addFile(new WebFontFile(this.load, 'Press Start 2P'));
   }

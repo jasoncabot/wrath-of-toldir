@@ -28,30 +28,39 @@ seq():number {
   return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
 }
 
-actionType():Action {
+ts():number {
   const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+}
+
+actionType():Action {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : Action.NONE;
 }
 
 action<T extends flatbuffers.Table>(obj:any):any|null {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.__union(obj, this.bb_pos + offset) : null;
 }
 
 static startCommand(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(4);
 }
 
 static addSeq(builder:flatbuffers.Builder, seq:number) {
   builder.addFieldInt32(0, seq, 0);
 }
 
+static addTs(builder:flatbuffers.Builder, ts:number) {
+  builder.addFieldInt32(1, ts, 0);
+}
+
 static addActionType(builder:flatbuffers.Builder, actionType:Action) {
-  builder.addFieldInt8(1, actionType, Action.NONE);
+  builder.addFieldInt8(2, actionType, Action.NONE);
 }
 
 static addAction(builder:flatbuffers.Builder, actionOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, actionOffset, 0);
+  builder.addFieldOffset(3, actionOffset, 0);
 }
 
 static endCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -67,9 +76,10 @@ static finishSizePrefixedCommandBuffer(builder:flatbuffers.Builder, offset:flatb
   builder.finish(offset, undefined, true);
 }
 
-static createCommand(builder:flatbuffers.Builder, seq:number, actionType:Action, actionOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createCommand(builder:flatbuffers.Builder, seq:number, ts:number, actionType:Action, actionOffset:flatbuffers.Offset):flatbuffers.Offset {
   Command.startCommand(builder);
   Command.addSeq(builder, seq);
+  Command.addTs(builder, ts);
   Command.addActionType(builder, actionType);
   Command.addAction(builder, actionOffset);
   return Command.endCommand(builder);

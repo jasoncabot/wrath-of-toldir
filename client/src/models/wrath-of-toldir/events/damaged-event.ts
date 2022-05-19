@@ -33,13 +33,18 @@ amount():number {
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
-state():DamageState {
+hp():number {
   const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+}
+
+state():DamageState {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.readInt8(this.bb_pos + offset) : DamageState.Default;
 }
 
 static startDamagedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(4);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -50,8 +55,12 @@ static addAmount(builder:flatbuffers.Builder, amount:number) {
   builder.addFieldInt16(1, amount, 0);
 }
 
+static addHp(builder:flatbuffers.Builder, hp:number) {
+  builder.addFieldInt32(2, hp, 0);
+}
+
 static addState(builder:flatbuffers.Builder, state:DamageState) {
-  builder.addFieldInt8(2, state, DamageState.Default);
+  builder.addFieldInt8(3, state, DamageState.Default);
 }
 
 static endDamagedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -59,10 +68,11 @@ static endDamagedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createDamagedEvent(builder:flatbuffers.Builder, key:number, amount:number, state:DamageState):flatbuffers.Offset {
+static createDamagedEvent(builder:flatbuffers.Builder, key:number, amount:number, hp:number, state:DamageState):flatbuffers.Offset {
   DamagedEvent.startDamagedEvent(builder);
   DamagedEvent.addKey(builder, key);
   DamagedEvent.addAmount(builder, amount);
+  DamagedEvent.addHp(builder, hp);
   DamagedEvent.addState(builder, state);
   return DamagedEvent.endDamagedEvent(builder);
 }
