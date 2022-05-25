@@ -70,11 +70,11 @@ export class ArtificialIntelligence {
                 if (x < 0.25) {
                     pos.x = Math.max(0, pos.x - 1);
                 } else if (x < 0.50) {
-                    pos.x = Math.min(this.map.width, pos.x + 1);
+                    pos.x = Math.min(this.map.width - 1, pos.x + 1);
                 } else if (x < 0.75) {
                     pos.y = Math.max(0, pos.y - 1);
                 } else {
-                    pos.y = Math.min(this.map.height, pos.y + 1);
+                    pos.y = Math.min(this.map.height - 1, pos.y + 1);
                 }
                 if (!this.positionKeeper.isBlocked(pos)) {
                     this.positionKeeper.setEntityPosition(npcId, pos);

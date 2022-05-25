@@ -4,7 +4,7 @@ const common = require('./webpack.common')
 const dev = {
   mode: 'development',
   stats: 'errors-warnings',
-  devtool: 'eval',
+  devtool: 'eval-cheap-module-source-map',
   devServer: {
     open: false
   }

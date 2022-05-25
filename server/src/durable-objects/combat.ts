@@ -1,3 +1,4 @@
+import { Position } from "@/game/components/position-keeper";
 import { EntityId } from "@/game/game";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 
@@ -18,6 +19,16 @@ export interface AttackResult {
     damage: number
     hp: number
     state: DamageState
+}
+
+export interface AttackDamageResult {
+    attackerId: EntityId
+    targetId: EntityId
+    key: number
+    damage: number
+    remaining: number
+    state: DamageState
+    position: Position
 }
 
 export interface SpawnResult {

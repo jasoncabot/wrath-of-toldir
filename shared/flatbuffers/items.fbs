@@ -1,0 +1,21 @@
+namespace WrathOfToldir.Items;
+
+enum ItemTexture : byte {
+    Sword,
+    Potion
+}
+
+table DamageComponent {
+    min: uint8;
+    max: uint8;
+}
+
+union Component {
+    DamageComponent
+}
+
+table Item {
+    id: [uint8];
+    template: ItemTexture;
+    components: [Component];
+}

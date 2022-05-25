@@ -24,30 +24,40 @@ const textForType = (type: LabelledBarType, data: LabelledBarDataSource) => {
 export default class LabelledBar extends Phaser.GameObjects.Graphics {
     labelledBarType: LabelledBarType;
     label: Phaser.GameObjects.Text
+    background: Phaser.GameObjects.Graphics;
+    border: Phaser.GameObjects.Graphics;
+
+    setVisible(value: boolean): this {
+        super.setVisible(value);
+        this.label.setVisible(value);
+        this.background.setVisible(value);
+        this.border.setVisible(value);
+        return this;
+    }
 
     constructor(scene: MainScene, x: number, y: number, type: LabelledBarType, dataSource: LabelledBarDataSource) {
         super(scene, { x, y });
 
         this.labelledBarType = type;
 
-        const background = this.scene.add.graphics({ x, y });
-        background.fillStyle(0x3e3546);
-        background.fillRect(0, 0, 155, 18);
+        this.background = this.scene.add.graphics({ x, y });
+        this.background.fillStyle(0x3e3546);
+        this.background.fillRect(0, 0, 155, 18);
 
         scene.add.existing(this);
 
         this.label = scene.add.text(x + 3, y + 6, textForType(type, dataSource), { color: '#ffffff', fontSize: '8px', fontFamily: "'Press Start 2P'" })
             .setOrigin(0, 0);
 
-        const border = this.scene.add.graphics({ x, y });
-        border.lineStyle(1, 0x2e222f);
-        border.strokeRect(0, 0, 155, 18);
-        border.lineStyle(1, 0x625565);
-        border.strokeRect(1, 1, 153, 16);
-        border.lineStyle(1, 0x3e3546);
-        border.strokeRect(2, 2, 151, 14);
+        this.border = this.scene.add.graphics({ x, y });
+        this.border.lineStyle(1, 0x2e222f);
+        this.border.strokeRect(0, 0, 155, 18);
+        this.border.lineStyle(1, 0x625565);
+        this.border.strokeRect(1, 1, 153, 16);
+        this.border.lineStyle(1, 0x3e3546);
+        this.border.strokeRect(2, 2, 151, 14);
 
-        scene.cameras.main.ignore([this, this.label, border, background]);
+        scene.cameras.main.ignore([this, this.label, this.border, this.background]);
 
         switch (this.labelledBarType) {
             case LabelledBarType.Health:

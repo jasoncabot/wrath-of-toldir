@@ -1,14 +1,19 @@
 import { AttackData, MagicAttack, NormalAttack } from "@/models/attacks";
 import { AttackCommand } from "@/models/commands";
-import { AttackEvent, DamagedEvent, Entity as EntityEvent, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
+import { EntityInteraction } from "@/models/entities";
+import { AttackEvent, DamagedEvent, Entity as EntityEvent, Item, ItemDropEvent, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
 import { MapLayer, TileCollision, TileSet } from "@/models/maps";
 import { ChatEvent } from "@/models/wrath-of-toldir/events/chat-event";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
 import { PrivateStats } from "@/models/wrath-of-toldir/private-stats";
-import { Builder } from "flatbuffers";
+import { Builder, ByteBuffer } from "flatbuffers";
 import { EntityId, Entity, PlayerId, TiledJSON, Health } from "../game";
 import { Position, PositionKeeper } from "./position-keeper";
+import { parse as uuidParse } from 'uuid';
+import { ItemTexture } from "@/models/wrath-of-toldir/items/item-texture";
+import { Component } from "@/models/wrath-of-toldir/items/component";
+import { DamageComponent } from "@/models/wrath-of-toldir/items/damage-component";
 
 type Effects = { builder: Builder, eventOffsets: number[], eventTypeOffsets: number[] };
 
@@ -72,6 +77,7 @@ export class EventBuilder {
 
         EntityEvent.startEntity(builder);
         EntityEvent.addCharLayer(builder, other.position.z);
+        EntityEvent.addInteraction(builder, EntityInteraction.Default); // TODO: interaction
         EntityEvent.addKey(builder, other.key);
         EntityEvent.addPos(builder, Vec2.createVec2(builder, other.position.x, other.position.y));
         EntityEvent.addTexture(builder, other.texture);
@@ -111,13 +117,13 @@ export class EventBuilder {
             const npc = npcs[npcId];
             const hp = healthRecords[npcId];
             if (!hp) {
-                debugger
                 throw new Error(`failed to read HP (npcs: ${Object.keys(npcs).length}, hp: ${Object.keys(healthRecords).length})`);
             }
             const pos = positionKeeper.getEntityPosition(npcId);
 
             EntityEvent.startEntity(builder);
             EntityEvent.addCharLayer(builder, pos.z);
+            EntityEvent.addInteraction(builder, EntityInteraction.Default); // TODO: interaction
             EntityEvent.addKey(builder, npc.key);
             EntityEvent.addPos(builder, Vec2.createVec2(builder, pos.x, pos.y));
             EntityEvent.addTexture(builder, npc.texture);
@@ -129,6 +135,7 @@ export class EventBuilder {
 
         EntityEvent.startEntity(builder);
         EntityEvent.addCharLayer(builder, playerData.position.z);
+        EntityEvent.addInteraction(builder, EntityInteraction.Default); // TODO: interaction
         EntityEvent.addKey(builder, playerData.key);
         EntityEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
         EntityEvent.addTexture(builder, playerData.texture);
@@ -210,4 +217,24 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.ChatEvent);
     }
 
+    pushItemDrop(playerId: PlayerId, position: Position, id: string) {
+        const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
+
+        const componentType = Component.DamageComponent;
+        const componentTypeOffsets = Item.createComponentsTypeVector(builder, [componentType]);
+        // TODO: these should be set from the item database
+        const componentOffset = DamageComponent.createDamageComponent(builder, 4, 7);
+        const componentOffsets = Item.createComponentsVector(builder, [componentOffset]);
+
+        const byteArray = uuidParse(id);
+        const stuff = Uint8Array.from(byteArray);
+        const idOffset = Item.createIdVector(builder, stuff);
+        const itemOffset = Item.createItem(builder, idOffset, ItemTexture.Sword, componentTypeOffsets, componentOffsets);
+
+        ItemDropEvent.startItemDropEvent(builder);
+        ItemDropEvent.addPos(builder, Vec2.createVec2(builder, position.x, position.y));
+        ItemDropEvent.addItem(builder, itemOffset);
+        eventOffsets.push(ItemDropEvent.endItemDropEvent(builder));
+        eventTypeOffsets.push(Update.ItemDropEvent);
+    }
 }

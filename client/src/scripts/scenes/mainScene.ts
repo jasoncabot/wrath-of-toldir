@@ -3,8 +3,8 @@ import { Direction, GridEngine, Position } from 'grid-engine';
 import { AnimatedSpriteDirectionalFrames, entityTextureNames, textureMap } from "../../assets/spritesheets/Sprites";
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
-import { Action, JoinCommand, MoveCommand, SpawnCommand, Vec2 } from '../../models/commands';
-import { AttackData, AttackEvent, DamageState, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
+import { Action, JoinCommand, MoveCommand, PickupCommand, SpawnCommand, Vec2 } from '../../models/commands';
+import { AttackData, AttackEvent, DamageState, Item as ItemBuffer, ItemDropEvent, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
 import { ChatCommand } from '../../models/wrath-of-toldir/commands/chat-command';
@@ -18,11 +18,13 @@ import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
 import { DebugText, PlayerCharacter } from '../objects/';
 import ActionButton, { ActionButtonSelected, ActionButtonType } from "../objects/actionButton";
 import ChatDialog from '../objects/chatDialog';
+import Item from "../objects/item";
 import LabelledBar, { LabelledBarDataSource, LabelledBarType } from "../objects/labelledBar";
 import { keyForElevation, normalisedFacingDirection } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
 import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
 import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
+import { parse as uuidParse } from 'uuid';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -141,9 +143,9 @@ export default class MainScene extends Phaser.Scene {
     };
     this.hudDataSource = ds;
 
-    this.healthBar = new LabelledBar(this, 12, 504, LabelledBarType.Health, ds);
-    this.magicBar = new LabelledBar(this, 12, 525, LabelledBarType.Magic, ds);
-    this.experienceBar = new LabelledBar(this, 12, 546, LabelledBarType.Experience, ds);
+    this.healthBar = new LabelledBar(this, 12, 504, LabelledBarType.Health, ds).setVisible(false);
+    this.magicBar = new LabelledBar(this, 12, 525, LabelledBarType.Magic, ds).setVisible(false);
+    this.experienceBar = new LabelledBar(this, 12, 546, LabelledBarType.Experience, ds).setVisible(false);
 
     this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
 
@@ -319,7 +321,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.player.playAttackAnimation(facing);
 
-    let builder = new Builder(1024);
+    let builder = new Builder(128);
     const attack = AttackCommand.createAttackCommand(builder,
       AttackData.NormalAttack,
       NormalAttack.createNormalAttack(builder, Directions.indexOf(facing)));
@@ -333,13 +335,51 @@ export default class MainScene extends Phaser.Scene {
     this.connection?.send(builder.asUint8Array());
   }
 
+  pickupItem(tile: Phaser.Tilemaps.Tile) {
+    // Pickup this item on the client
+    const item = tile.properties["item"] as Item;
+    this.map.putTileAt(-1, tile.x, tile.y, false, "item1");
+    delete tile.properties["item"];
+
+    // Pickup this item on the server
+    let builder = new Builder(128);
+    const idOffset = ItemBuffer.createIdVector(builder, Uint8Array.from(uuidParse(item.id)));
+    const pickup = PickupCommand.createPickupCommand(builder, idOffset);
+    Command.startCommand(builder);
+    Command.addSeq(builder, ++this.commandSequencer);
+    Command.addTs(builder, new Date().getUTCMilliseconds());
+    Command.addActionType(builder, Action.PickupCommand);
+    Command.addAction(builder, pickup);
+    const update = Command.endCommand(builder);
+    builder.finish(update);
+    this.connection?.send(builder.asUint8Array());
+  }
+
   applyDefaultAction(direction: Direction, position: Position) {
     if (this.currentState !== MapSceneState.READY) return;
 
-    // TODO: if we are facing something interesting
+    // check if we are facing something interesting
     const playerLayer = this.gridEngine.getCharLayer(this.player.identifier);
+
+    const charLayer = this.gridEngine.getCharLayer(this.player.identifier);
+    const tile = this.map.getTileAt(position.x, position.y, true, charLayer);
     const targetCharacterId = this.gridEngine.getCharactersAt(position, playerLayer)[0];
-    const target = targetCharacterId ? this.gridEngine.getSprite(targetCharacterId) as PlayerCharacter : { identifier: '0' };
+    const target = targetCharacterId ? this.gridEngine.getSprite(targetCharacterId) as PlayerCharacter : undefined;
+
+    // we can pick up things on a tile next to us
+    const tileItem = tile && tile.properties["item"];
+    if (tileItem) {
+      this.pickupItem(tile);
+      return;
+    }
+
+    // if target is friendly, talk rather than attack
+    const targetAction = target?.interaction;
+    const forcingAttack = false; // TODO: set this if we are really sure we want to attack this entity
+    if (target && targetAction && !forcingAttack) {
+      this.player.interact(target, targetAction);
+      return;
+    }
 
     const type = [this.actionButton1, this.actionButton2, this.actionButton3].find(b => b.isSelected)!.actionType;
     switch (type) {
@@ -356,7 +396,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.player.canMagic = false;
         this.time.delayedCall(500, () => { this.player.canMagic = true });
-        this.submitMagic(parseInt(target.identifier, 10) ?? 0, direction, position);
+        this.submitMagic(parseInt(target?.identifier ?? "0", 10) ?? 0, direction, position);
         break;
       }
       case ActionButtonType.Potion: {
@@ -450,6 +490,17 @@ export default class MainScene extends Phaser.Scene {
           }));
           break;
         }
+        case Update.ItemDropEvent: {
+          const event: ItemDropEvent = update.events(i, new ItemDropEvent());
+          const charLayer = this.gridEngine.getCharLayer(this.player.identifier);
+          const tile = this.map.getTileAt(event.pos()!.x(), event.pos()!.y(), true, charLayer);
+          const item = new Item(event.item()!);
+          tile.properties["item"] = item;
+
+          // TODO figure out the global ids of items properly
+          this.map.putTileAt(item.tileTexture(), event.pos()!.x(), event.pos()!.y(), false, "item1");
+          break;
+        }
       }
     }
   }
@@ -492,9 +543,10 @@ export default class MainScene extends Phaser.Scene {
     }
 
     // create the data for every layer
+    const layerObject = new MapLayer();
     const dataLayers: Phaser.Tilemaps.LayerData[] = [];
     for (let i = 0; i < map.layersLength(); i++) {
-      const layer = map.layers(i, new MapLayer())!;
+      const layer = map.layers(i, layerObject)!;
 
       var layerData = new Phaser.Tilemaps.LayerData({
         name: layer.key()!,
@@ -538,12 +590,22 @@ export default class MainScene extends Phaser.Scene {
 
     // create the images associated with this layer, which has to be done after setting the map.layers
     for (let i = 0; i < map.layersLength(); i++) {
-      const layer = map.layers(i, new MapLayer())!;
-      const tileDisplayLayer = this.map.createLayer(layer.key()!, tilesetLayers, 0, 0);
+      const layer = map.layers(i, layerObject)!;
+
+      // We insert a dyanmic layer underneath all character levels to deal with items that are dropped to the floor
+      let tileDisplayLayer;
       if (layer.key() == "charLevel1") {
-        this.collisionDisplayLayer = tileDisplayLayer.setAlpha(0.3).setVisible(false);
+        tileDisplayLayer = this.map.createBlankLayer("item1", tilesetLayers, 0, 0);
+
+        this.collisionDisplayLayer = this.map.createLayer(layer.key()!, tilesetLayers, 0, 0)
+          .setAlpha(0.3)
+          .setVisible(false);
+        this.interfaceCamera.ignore(this.collisionDisplayLayer);
+      } else {
+        tileDisplayLayer = this.map.createLayer(layer.key()!, tilesetLayers, 0, 0);
       }
       this.interfaceCamera.ignore(tileDisplayLayer);
+
     }
 
     this.debugText.prefix = `(${event.player()!.pos()!.x()},${event.player()!.pos()!.y()})`;
@@ -557,7 +619,7 @@ export default class MainScene extends Phaser.Scene {
     this.hudDataSource.experience.current = event.stats()!.exp()!;
     this.hudDataSource.experience.max = event.stats()!.maxExp()!;
     this.hudDataSource.experience.level = event.stats()!.level()!;
-    [this.healthBar, this.magicBar, this.experienceBar].forEach(bar => bar.onDataSourceUpdated(this.hudDataSource));
+    [this.healthBar, this.magicBar, this.experienceBar].forEach(bar => bar.setVisible(true).onDataSourceUpdated(this.hudDataSource));
 
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
@@ -571,7 +633,7 @@ export default class MainScene extends Phaser.Scene {
 
     for (let i = 0; i < event.npcsLength(); i++) {
       const npc = event.npcs(i)!;
-      const sprite = new PlayerCharacter(this, npc.texture().toString(), npc);
+      const sprite = new PlayerCharacter(this, "", npc);
       this.entities.push(sprite);
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);
@@ -599,6 +661,17 @@ export default class MainScene extends Phaser.Scene {
       const update = Command.endCommand(builder);
       builder.finish(update);
       this.connection?.send(builder.asUint8Array());
+    });
+
+    this.gridEngine.positionChangeFinished().subscribe(({ charId, enterTile, enterLayer }) => {
+      // we only care about ourselves
+      if (charId !== this.player.identifier) return;
+
+      const tile = this.map.getTileAt(enterTile.x, enterTile.y, true, enterLayer);
+
+      if (tile.properties["item"]) {
+        this.pickupItem(tile);
+      }
     });
 
     // Player Animations on movement

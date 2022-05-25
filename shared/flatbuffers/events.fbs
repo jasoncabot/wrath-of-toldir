@@ -1,5 +1,5 @@
 include "maps.fbs";
-include "maps.fbs";
+include "items.fbs";
 include "entities.fbs";
 include "attacks.fbs";
 
@@ -53,6 +53,11 @@ table MapChangedEvent {
     char_layer: Elevation;
 }
 
+table ItemDropEvent {
+    pos: Vec2;
+    item: WrathOfToldir.Items.Item;
+}
+
 union Update { 
     JoinEvent,
     MoveEvent,
@@ -61,7 +66,8 @@ union Update {
     MapJoinedEvent,
     MapChangedEvent,
     DamagedEvent,
-    ChatEvent
+    ChatEvent,
+    ItemDropEvent
 }
 
 table EventLog {

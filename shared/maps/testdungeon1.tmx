@@ -14,6 +14,11 @@
  <tileset firstgid="3339" source="tilesets/terrain.tsx"/>
  <tileset firstgid="3795" source="tilesets/water.tsx"/>
  <tileset firstgid="4371" source="tilesets/windows.tsx"/>
+ <tileset firstgid="4501" source="tilesets/bs_decoration.tsx"/>
+ <tileset firstgid="4869" source="tilesets/bs_doors_windows.tsx"/>
+ <tileset firstgid="5040" source="tilesets/bs_floors.tsx"/>
+ <tileset firstgid="5216" source="tilesets/bs_walls.tsx"/>
+ <tileset firstgid="5552" source="tilesets/bs_weapons.tsx"/>
  <layer id="1" name="l1" width="30" height="40">
   <data encoding="csv">
 1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,0,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,1159,

@@ -5,6 +5,7 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 ## TODO List
 
 - [ ] Interact with objects / friendly NPCs
+- [ ] Transitions between scenes can be animated nicely
 - [ ] Quests
 - [ ] Character should gain/lose health/mana/experience
 - [ ] Actually spend some time making the React app frame look semi-decent

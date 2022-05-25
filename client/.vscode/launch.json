@@ -10,7 +10,11 @@
             "type": "chrome",
             "url": "http://0.0.0.0:8080",
             "webRoot": "${workspaceFolder}",
-            "preLaunchTask": "yarn start"
+            "preLaunchTask": "yarn start",
+            "sourceMapPathOverrides": {
+                "webpack:///./~/*": "${workspaceFolder}/node_modules/*",
+                "webpack://?:*/*": "${workspaceFolder}/*"
+            }
         }
     ]
 }

@@ -1,4 +1,5 @@
 import { durableObjectActionMap } from "@/handlers/maps";
+import { Entity } from "@/models/events";
 import { Elevation } from "@/models/wrath-of-toldir/elevation";
 import { EntityId, MapTransition, PlayerId, TiledJSON } from "../game";
 
@@ -329,6 +330,15 @@ export class PositionKeeper {
             if (entityId === otherPlayerId) return;
             const bounds = this.viewableBounds(otherPlayerId);
             if (!this.inBounds(point, bounds)) return;
+            callback(otherPlayerId);
+        });
+    }
+
+    findDropWitnesses(position: Position, allPlayerIds: EntityId[], callback: ((id: PlayerId) => void)) {
+        // everyone within range should see the drop
+        allPlayerIds.forEach(otherPlayerId => {
+            const viewBox = this.viewableBounds(otherPlayerId);
+            if (!this.inBounds(position, viewBox)) return;
             callback(otherPlayerId);
         });
     }

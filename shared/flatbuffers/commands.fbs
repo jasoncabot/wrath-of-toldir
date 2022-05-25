@@ -27,13 +27,18 @@ table SpawnCommand {
     pos: Vec2;
 }
 
+table PickupCommand {
+    id: [uint8];
+}
+
 union Action {
     MoveCommand,
     JoinCommand,
     LeaveCommand,
     AttackCommand,
     ChatCommand,
-    SpawnCommand
+    SpawnCommand,
+    PickupCommand
 }
 
 table Command {

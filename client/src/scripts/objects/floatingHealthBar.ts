@@ -7,6 +7,9 @@ export interface HealthDataSource {
     emitter: Phaser.Events.EventEmitter
 }
 
+const width = 48;
+const height = 10;
+
 export default class FloatingHealthBar extends Phaser.GameObjects.Graphics {
     background: Phaser.GameObjects.Graphics | undefined;
     bar: Phaser.GameObjects.Image | undefined;
@@ -17,9 +20,9 @@ export default class FloatingHealthBar extends Phaser.GameObjects.Graphics {
 
         this.background = this.scene.add.graphics({ x, y }).setAlpha(0.8);
         this.background.lineStyle(1, 0xFFFFFF);
-        this.background.strokeRect(-24, -18, 48, 10);
+        this.background.strokeRect(-(width / 2), -(height + 8), width, height);
 
-        this.bar = this.scene.add.image(x - 23, y - 17, 'floating_hp').setOrigin(0, 0).setAlpha(0.8);
+        this.bar = this.scene.add.image(x - ((width / 2) - 1), y - ((height + 8) - 1), 'floating_hp').setOrigin(0, 0).setAlpha(0.8);
 
         scene.interfaceCamera.ignore([this, this.background, this.bar]);
 
@@ -34,7 +37,14 @@ export default class FloatingHealthBar extends Phaser.GameObjects.Graphics {
     setPosition(x?: number, y?: number, z?: number, w?: number): this {
         super.setPosition(x, y, z, w);
         this.background?.setPosition(x, y).setDepth(this.depth + 1);
-        this.bar?.setPosition((x ?? 0) - 23, (y ?? 0) - 17).setDepth(this.depth + 1);
+        this.bar?.setPosition((x ?? 0) - ((width / 2) - 1), (y ?? 0) - ((height + 8) - 1)).setDepth(this.depth + 1);
+        return this;
+    }
+
+    setDepth(value: number): this {
+        super.setDepth(value);
+        this.background?.setDepth(value);
+        this.bar?.setDepth(value);
         return this;
     }
 

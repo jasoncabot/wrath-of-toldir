@@ -1,14 +1,15 @@
-import { AttackResult, SpawnResult } from "@/durable-objects/combat";
+import { AttackDamageResult, AttackResult, SpawnResult } from "@/durable-objects/combat";
 import { Connection } from "@/durable-objects/map";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
-import { Action, AttackCommand, AttackData, ChatCommand, EntityTexture, JoinCommand, MoveCommand, SpawnCommand } from "@/models/commands";
-import { Elevation } from "@/models/events";
+import { Action, AttackCommand, AttackData, ChatCommand, EntityTexture, JoinCommand, MoveCommand, PickupCommand, SpawnCommand } from "@/models/commands";
+import { Elevation, ItemDropEvent, Update } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { v4 as uuidv4 } from 'uuid';
 import { Entity, EntityId, Health, MapTransition, PlayerId, ReceivedCommand, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
 import { Position, PositionKeeper } from "./position-keeper";
+import { stringify as uuidStringify } from 'uuid';
 
 export type CharacterDetailLookup = (playerId: PlayerId, characterId: PlayerId) => Promise<{ name: string, texture: EntityTexture }>;
 
@@ -167,13 +168,19 @@ export class CommandQueue {
                     // update game state
                     const damages = await this.performAttack(entityId, attack);
                     // check if anything died
-                    damages.forEach(attack => {
-                        if (attack.state == DamageState.Dead) {
-                            this.positionKeeper.removeEntity(attack.targetId);
-                            delete this.npcs[attack.targetId];
-                            // TODO: finish destroying this NPC
-                            // increase experience
-                            // drop loop
+                    damages.forEach(damage => {
+                        if (damage.state == DamageState.Dead) {
+                            // Destroy this NPC
+                            this.positionKeeper.removeEntity(damage.targetId);
+                            delete this.npcs[damage.targetId];
+
+                            // TODO: increase experience of player
+
+                            // drop loot
+                            const itemId = uuidv4();
+                            this.positionKeeper.findDropWitnesses(damage.position, players, (otherPlayerId) => {
+                                this.eventBuilder.pushItemDrop(otherPlayerId, damage.position, itemId);
+                            });
                         }
                     });
 
@@ -242,6 +249,19 @@ export class CommandQueue {
                     players.forEach(otherPlayerId => {
                         this.eventBuilder.pushJoinEvent(otherPlayerId, "", entity, health);
                     });
+
+                    break;
+                }
+
+                case Action.PickupCommand: {
+                    // read client action
+                    const pickup: PickupCommand = command.action(new PickupCommand());
+
+                    // TODO: update game state
+                    // console.log("player with id " + entityId + " picked up " + uuidStringify(pickup.idArray()!))
+
+                    // inform other players
+                    break;
                 }
             }
         }
@@ -266,7 +286,7 @@ export class CommandQueue {
         }
 
         const targetEntityIds = this.positionKeeper.getEntitiesAtPosition(facingPosition, true);
-        let damages: { attackerId: EntityId, targetId: EntityId, key: number, damage: number, remaining: number, state: DamageState }[] = [];
+        let damages: AttackDamageResult[] = [];
         if (targetEntityIds.size > 0) {
             const playerIdCombat = this.combat.idFromName(playerId);
             const stub = this.combat.get(playerIdCombat);
@@ -283,7 +303,8 @@ export class CommandQueue {
                     key: npc.key,
                     damage,
                     remaining: hp,
-                    state
+                    state,
+                    position: facingPosition
                 });
             });
         }

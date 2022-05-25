@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="48" tileheight="48" infinite="0" nextlayerid="6" nextobjectid="1">
+<map version="1.8" tiledversion="1.8.2" orientation="orthogonal" renderorder="right-down" width="10" height="10" tilewidth="48" tileheight="48" infinite="0" nextlayerid="7" nextobjectid="1">
  <editorsettings>
   <export target="../../server/src/data/maps/testroom1.json" format="json"/>
  </editorsettings>
@@ -8,16 +8,27 @@
  <tileset firstgid="997" source="tilesets/decoration.tsx"/>
  <tileset firstgid="1141" source="tilesets/windows.tsx"/>
  <tileset firstgid="1271" source="tilesets/collisions.tsx"/>
+ <tileset firstgid="1301" source="tilesets/farming.tsx"/>
+ <tileset firstgid="1409" source="tilesets/marketplace.tsx"/>
+ <tileset firstgid="1969" source="tilesets/nature.tsx"/>
+ <tileset firstgid="2137" source="tilesets/roofs.tsx"/>
+ <tileset firstgid="3469" source="tilesets/terrain.tsx"/>
+ <tileset firstgid="3925" source="tilesets/water.tsx"/>
+ <tileset firstgid="4501" source="tilesets/bs_decoration.tsx"/>
+ <tileset firstgid="4869" source="tilesets/bs_doors_windows.tsx"/>
+ <tileset firstgid="5040" source="tilesets/bs_floors.tsx"/>
+ <tileset firstgid="5216" source="tilesets/bs_walls.tsx"/>
+ <tileset firstgid="5552" source="tilesets/bs_weapons.tsx"/>
  <layer id="1" name="l1" width="10" height="10">
   <data encoding="csv">
 274,275,275,275,275,275,275,275,275,276,
 82,82,82,82,82,82,82,82,82,82,
+82,82,82,82,81,82,82,82,82,82,
+82,82,82,82,82,82,82,82,81,82,
 82,82,82,82,82,82,82,82,82,82,
-82,82,82,82,82,82,82,82,82,82,
-82,82,82,82,82,82,82,82,82,82,
-82,82,82,82,82,82,82,82,82,82,
-82,82,82,82,82,82,82,82,82,82,
-82,82,82,82,82,82,82,82,82,82,
+82,82,82,82,82,82,82,82,81,82,
+82,82,82,82,81,82,82,82,82,82,
+82,81,81,82,82,82,81,82,82,82,
 82,82,82,82,82,82,82,82,82,82,
 82,82,82,82,82,82,82,82,82,82
 </data>
@@ -39,13 +50,13 @@
  <layer id="2" name="l3" width="10" height="10">
   <data encoding="csv">
 0,0,0,0,0,0,0,0,0,0,
-0,1071,1071,0,0,0,0,0,1045,0,
+0,0,0,0,0,0,0,0,1045,0,
 0,0,0,0,0,0,0,0,0,0,
+0,1523,0,1525,0,0,0,0,0,0,
+0,1482,1483,1484,0,0,1098,0,0,0,
+0,1517,1518,1519,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,1098,0,0,0,
-0,0,0,0,0,0,0,0,0,0,
-0,0,0,1072,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,
+0,1511,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,1154,0,0,0,0,0
 </data>
@@ -57,23 +68,23 @@
   </properties>
   <data encoding="csv">
 1284,1284,1284,1284,1284,1284,1284,1284,1284,1284,
-1284,1284,1284,0,0,0,0,0,1284,1284,
+1284,0,0,0,0,0,0,0,1284,1284,
+1284,1290,0,1298,0,0,0,0,0,1284,
+1284,1284,0,1284,1295,0,1298,0,0,1284,
+1284,1284,0,1284,0,1289,1284,1295,0,1284,
+1284,1284,1284,1284,0,0,0,0,0,1284,
 1284,0,0,0,0,0,0,0,0,1284,
-1284,0,0,0,0,0,1298,0,0,1284,
-1284,0,0,0,0,0,1284,0,0,1284,
-1284,0,0,0,0,0,0,0,0,1284,
-1284,0,0,1284,0,0,0,0,0,1284,
-1284,0,0,0,0,0,0,0,0,1284,
+1284,1284,0,0,0,0,0,0,0,1284,
 1284,0,0,0,0,0,0,0,0,1284,
 1284,1284,1284,1284,0,1284,1284,1284,1284,1284
 </data>
  </layer>
  <layer id="4" name="l4" width="10" height="10">
   <data encoding="csv">
-0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,1086,0,0,0,
+0,1418,1419,1420,0,0,0,0,0,0,
+0,1453,1454,1455,0,0,0,0,0,0,
+0,1488,1489,1490,0,0,0,0,0,0,
+0,0,1524,0,0,0,1086,0,0,0,
 0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,

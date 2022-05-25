@@ -14,6 +14,11 @@
  <tileset firstgid="3765" source="tilesets/water.tsx"/>
  <tileset firstgid="4341" source="tilesets/windows.tsx"/>
  <tileset firstgid="4471" source="tilesets/collisions.tsx"/>
+ <tileset firstgid="4501" source="tilesets/bs_decoration.tsx"/>
+ <tileset firstgid="4869" source="tilesets/bs_doors_windows.tsx"/>
+ <tileset firstgid="5040" source="tilesets/bs_floors.tsx"/>
+ <tileset firstgid="5216" source="tilesets/bs_walls.tsx"/>
+ <tileset firstgid="5552" source="tilesets/bs_weapons.tsx"/>
  <layer id="1" name="terrain" width="100" height="100">
   <data encoding="csv">
 3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3811,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3785,3811,3785,3785,3785,3785,3785,3785,3785,3785,3785,

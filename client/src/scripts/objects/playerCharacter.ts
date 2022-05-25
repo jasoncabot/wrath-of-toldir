@@ -1,5 +1,6 @@
 import { CharacterData, Direction } from "grid-engine";
 import { textureForEntity, textureMap } from "../../assets/spritesheets/Sprites";
+import { EntityInteraction } from "../../models/entities";
 import { Elevation, Entity } from "../../models/events";
 import { MainScene } from "../scenes";
 import FloatingHealthBar from "./floatingHealthBar";
@@ -41,10 +42,12 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
   speechBubble: Phaser.GameObjects.Text;
   walkingState: "walk" | "stand" | "attack";
   healthBar: FloatingHealthBar;
+  interaction: EntityInteraction;
 
   constructor(scene: MainScene, name: string, entity: Entity) {
     super(scene, 0, 0, textureForEntity(entity.texture()), 0);
     this.identifier = entity.key().toString();
+    this.interaction = entity.interaction();
     this.name = name;
     this.gridEngineCharacterData = {
       id: this.identifier,
@@ -90,6 +93,20 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
     this.scene.time.delayedCall(1000, () => {
       this.speechBubble.visible = false;
     });
+  }
+
+  interact(target: PlayerCharacter, targetAction: EntityInteraction) {
+    switch (targetAction) {
+      case EntityInteraction.ItemShop:
+        console.log("Opening item shop with key " + target.identifier);
+        break;
+      case EntityInteraction.Quest:
+        console.log("Opening quest with key " + target.identifier);
+        break;
+      case EntityInteraction.WeaponShop:
+        console.log("Opening weapon shop with key " + target.identifier);
+        break;
+    }
   }
 
   addDamage(amount: number, health: number) {
@@ -222,8 +239,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
     if (this.speechBubble.visible) {
       this.speechBubble.setPosition(this.getCenter().x, this.getTopCenter().y).setDepth(this.depth + 2);
     }
-
-    this.healthBar.setPosition(this.getCenter().x, this.getTopCenter().y).setDepth(this.depth + 1);
+    this.healthBar.setPosition(this.getCenter().x, this.getBottomCenter().y + 18).setDepth(this.nameBadge.depth - 1);
   }
 
   destroy(fromScene?: boolean): void {

@@ -3,6 +3,7 @@
 import * as flatbuffers from 'flatbuffers';
 
 import { Elevation } from '../wrath-of-toldir/elevation';
+import { EntityInteraction } from '../wrath-of-toldir/entity-interaction';
 import { EntityTexture } from '../wrath-of-toldir/entity-texture';
 import { Vec2 } from '../wrath-of-toldir/vec2';
 
@@ -45,18 +46,23 @@ charLayer():Elevation {
   return offset ? this.bb!.readInt8(this.bb_pos + offset) : Elevation.Unknown;
 }
 
-hp():number {
+interaction():EntityInteraction {
   const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : EntityInteraction.Default;
 }
 
-maxHp():number {
+hp():number {
   const offset = this.bb!.__offset(this.bb_pos, 14);
   return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
 }
 
+maxHp():number {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+}
+
 static startEntity(builder:flatbuffers.Builder) {
-  builder.startObject(6);
+  builder.startObject(7);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -75,12 +81,16 @@ static addCharLayer(builder:flatbuffers.Builder, charLayer:Elevation) {
   builder.addFieldInt8(3, charLayer, Elevation.Unknown);
 }
 
+static addInteraction(builder:flatbuffers.Builder, interaction:EntityInteraction) {
+  builder.addFieldInt8(4, interaction, EntityInteraction.Default);
+}
+
 static addHp(builder:flatbuffers.Builder, hp:number) {
-  builder.addFieldInt32(4, hp, 0);
+  builder.addFieldInt32(5, hp, 0);
 }
 
 static addMaxHp(builder:flatbuffers.Builder, maxHp:number) {
-  builder.addFieldInt32(5, maxHp, 0);
+  builder.addFieldInt32(6, maxHp, 0);
 }
 
 static endEntity(builder:flatbuffers.Builder):flatbuffers.Offset {

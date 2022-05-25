@@ -80,11 +80,19 @@ enum EntityTexture : byte {
     Zombie3
 }
 
+enum EntityInteraction : byte {
+    Default,
+    ItemShop,
+    WeaponShop,
+    Quest
+}
+
 table Entity {
     key: uint32;
     texture: EntityTexture;
     pos: Vec2;
     char_layer: Elevation;
+    interaction: EntityInteraction = Default;
     // these go in entity because they are public
     hp: uint32;
     max_hp: uint32;
