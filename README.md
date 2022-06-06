@@ -15,10 +15,10 @@ A very simple MMORPG with the aim of learning more about Cloudflare's applicatio
 - [ ] Magic Attacks
 - [ ] Joining a map should only tell you about stuff you can see (so not all people / npcs and their positions)
 - [ ] Item system should hold inventory
-- [ ] Loot items
 - [ ] Water should be animated
 - [ ] Fishing
 - [ ] Crafting
+- [X] Loot items
 - [X] HUD - switch between physical and magical attack (numbers 1, 2, 3)
 - [X] Simple mobile controls using a virtual joystick
 - [X] Attacks should kill NPC
@@ -47,6 +47,36 @@ $ yarn start
 # In ./server
 $ yarn dev
 ```
+
+## Architecture
+
+Front end is built using a mixture of React for everything out of game and in-game text. Phaser is used to render the WebGL canvas using a 2d tile grid.
+
+API runs using a Cloudflare worker that is responsible for setting up an authenticated WebSocket connection to a Durable Object for all in-game actions.
+
+Players issue `Commands` encoded in a FlatBuffer, these are validated on the server, which then emits `Events` to interested Observers.
+
+The [current list of commands](https://github.com/jasoncabot/wrath-of-toldir/blob/main/shared/flatbuffers/commands.fbs#L35) that a player can issue.
+
+### Durable Objects
+
+Used to hold information about [various independent systems](https://github.com/jasoncabot/wrath-of-toldir/tree/main/server/src/durable-objects).
+
+#### Character
+
+One Durable Object exists for every user of the game. A single user can be considered as an account and has up to 5 characters.
+
+#### Map
+
+A map is the most complex object. It can be thought of as a zone or area in a traditional MMORPG. When a character connects it is a map that is responsible for establishing the WebSocket connection, responding to commands and issuing events to all characters.
+
+#### Item
+
+A Durable Object for items exists 1 per map, for every item that is on the floor. This is updated when items are dropped from monsters upon being killed or when a player picks up a particular item.
+
+#### Combat
+
+A Durable Object exists for every player within the game. It is responsible for holding a single players health, attack and defence statistics. When a player makes an attack or defends the adjustments are synchronously processed by this object.
 
 ## Map Editing
 
