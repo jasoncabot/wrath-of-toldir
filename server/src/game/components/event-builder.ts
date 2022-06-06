@@ -1,7 +1,7 @@
 import { AttackData, MagicAttack, NormalAttack } from "@/models/attacks";
 import { AttackCommand } from "@/models/commands";
 import { EntityInteraction } from "@/models/entities";
-import { AttackEvent, DamagedEvent, Entity as EntityEvent, Item, ItemDropEvent, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
+import { AttackEvent, DamagedEvent, Entity as EntityEvent, Item, ItemCollectedEvent, ItemDropEvent, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
 import { MapLayer, TileCollision, TileSet } from "@/models/maps";
 import { ChatEvent } from "@/models/wrath-of-toldir/events/chat-event";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
@@ -14,6 +14,7 @@ import { parse as uuidParse } from 'uuid';
 import { ItemTexture } from "@/models/wrath-of-toldir/items/item-texture";
 import { Component } from "@/models/wrath-of-toldir/items/component";
 import { DamageComponent } from "@/models/wrath-of-toldir/items/damage-component";
+import { ItemDrop } from "./item-hoarder";
 
 type Effects = { builder: Builder, eventOffsets: number[], eventTypeOffsets: number[] };
 
@@ -217,7 +218,7 @@ export class EventBuilder {
         eventTypeOffsets.push(Update.ChatEvent);
     }
 
-    pushItemDrop(playerId: PlayerId, position: Position, id: string) {
+    pushItemDrop(playerId: PlayerId, position: Position, item: ItemDrop) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         const componentType = Component.DamageComponent;
@@ -226,9 +227,8 @@ export class EventBuilder {
         const componentOffset = DamageComponent.createDamageComponent(builder, 4, 7);
         const componentOffsets = Item.createComponentsVector(builder, [componentOffset]);
 
-        const byteArray = uuidParse(id);
-        const stuff = Uint8Array.from(byteArray);
-        const idOffset = Item.createIdVector(builder, stuff);
+        const byteArray = uuidParse(item.id);
+        const idOffset = Item.createIdVector(builder, Uint8Array.from(byteArray));
         const itemOffset = Item.createItem(builder, idOffset, ItemTexture.Sword, componentTypeOffsets, componentOffsets);
 
         ItemDropEvent.startItemDropEvent(builder);
@@ -237,4 +237,20 @@ export class EventBuilder {
         eventOffsets.push(ItemDropEvent.endItemDropEvent(builder));
         eventTypeOffsets.push(Update.ItemDropEvent);
     }
+
+    pushItemPickup(playerId: PlayerId, item: ItemDrop, key: number) {
+        const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
+
+        const byteArray = uuidParse(item.id);
+        const idOffset = Item.createIdVector(builder, Uint8Array.from(byteArray));
+
+        ItemCollectedEvent.startItemCollectedEvent(builder);
+        ItemCollectedEvent.addId(builder, idOffset);
+        ItemCollectedEvent.addKey(builder, key);
+        ItemCollectedEvent.addPos(builder, Vec2.createVec2(builder, item.position.x, item.position.y));
+        eventOffsets.push(ItemCollectedEvent.endItemCollectedEvent(builder));
+        eventTypeOffsets.push(Update.ItemCollectedEvent);
+
+    }
+
 }

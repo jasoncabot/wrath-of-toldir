@@ -1,5 +1,6 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Direction, GridEngine, Position } from 'grid-engine';
+import { parse as uuidParse } from 'uuid';
 import { AnimatedSpriteDirectionalFrames, entityTextureNames, textureMap } from "../../assets/spritesheets/Sprites";
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
@@ -24,7 +25,6 @@ import { keyForElevation, normalisedFacingDirection } from '../objects/playerCha
 import Weapon from '../objects/weapon';
 import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
 import { authToken, currentCharacterRegion, currentCharacterToken } from '../services/auth';
-import { parse as uuidParse } from 'uuid';
 
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
@@ -499,6 +499,10 @@ export default class MainScene extends Phaser.Scene {
 
           // TODO figure out the global ids of items properly
           this.map.putTileAt(item.tileTexture(), event.pos()!.x(), event.pos()!.y(), false, "item1");
+          break;
+        }
+        case Update.ItemCollectedEvent: {
+          // TODO: someone else picked this item up - so remove it
           break;
         }
       }

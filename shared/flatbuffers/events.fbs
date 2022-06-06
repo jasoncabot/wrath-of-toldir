@@ -58,6 +58,15 @@ table ItemDropEvent {
     item: WrathOfToldir.Items.Item;
 }
 
+table ItemCollectedEvent {
+    // player who picked the item up
+    key: uint32; 
+    // where the item was located
+    pos: Vec2;
+    // id of the item that was collected
+    id: [uint8];
+}
+
 union Update { 
     JoinEvent,
     MoveEvent,
@@ -67,7 +76,8 @@ union Update {
     MapChangedEvent,
     DamagedEvent,
     ChatEvent,
-    ItemDropEvent
+    ItemDropEvent,
+    ItemCollectedEvent
 }
 
 table EventLog {

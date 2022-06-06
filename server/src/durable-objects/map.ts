@@ -2,6 +2,7 @@ import { loadMapData, validMaps } from "@/data/maps";
 import { ArtificialIntelligence } from "@/game/components/artificial-intelligence";
 import { CommandQueue } from "@/game/components/command-queue";
 import { EventBuilder } from "@/game/components/event-builder";
+import { ItemHoarder } from "@/game/components/item-hoarder";
 import { Position, PositionKeeper } from "@/game/components/position-keeper";
 import { Entity, EntityId, Health, PlayerId, TiledJSON } from "@/game/game";
 import { Action, LeaveCommand } from "@/models/commands";
@@ -32,6 +33,7 @@ export class Map implements DurableObject {
     positionKeeper: PositionKeeper;
     eventBuilder: EventBuilder;
     ai!: ArtificialIntelligence;
+    itemHoarder: ItemHoarder;
 
     constructor(private readonly state: DurableObjectState, private readonly env: Bindings) {
         this.state = state;
@@ -43,6 +45,7 @@ export class Map implements DurableObject {
         this.npcs = {};
         this.eventBuilder = new EventBuilder();
         this.positionKeeper = new PositionKeeper(this.state.storage, this.env.MAP, this.env.CHARACTER);
+        this.itemHoarder = new ItemHoarder(this.env.ITEM);
         this.healthRecords = {};
     }
 
@@ -51,7 +54,7 @@ export class Map implements DurableObject {
         this.mapData = loadMapData(mapId);
         // TODO: slice and dice these dependencies a bit better, perhaps put them in a context
         this.positionKeeper.updateWithMap(this.mapData);
-        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT);
+        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.itemHoarder);
         this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT);
     }
 

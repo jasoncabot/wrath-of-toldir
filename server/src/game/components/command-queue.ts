@@ -2,14 +2,14 @@ import { AttackDamageResult, AttackResult, SpawnResult } from "@/durable-objects
 import { Connection } from "@/durable-objects/map";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
 import { Action, AttackCommand, AttackData, ChatCommand, EntityTexture, JoinCommand, MoveCommand, PickupCommand, SpawnCommand } from "@/models/commands";
-import { Elevation, ItemDropEvent, Update } from "@/models/events";
+import { Elevation } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
-import { v4 as uuidv4 } from 'uuid';
+import { stringify as uuidStringify, v4 as uuidv4 } from 'uuid';
 import { Entity, EntityId, Health, MapTransition, PlayerId, ReceivedCommand, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
+import { ItemDrop, ItemHoarder } from "./item-hoarder";
 import { Position, PositionKeeper } from "./position-keeper";
-import { stringify as uuidStringify } from 'uuid';
 
 export type CharacterDetailLookup = (playerId: PlayerId, characterId: PlayerId) => Promise<{ name: string, texture: EntityTexture }>;
 
@@ -22,9 +22,10 @@ export class CommandQueue {
     private npcs: Record<EntityId, Entity>;
     private healthRecords: Record<EntityId, Health>;
     private combat: DurableObjectNamespace;
+    private itemHoarder: ItemHoarder;
 
     // TODO: This is horrid - still need to think about how to structure this and what it's responsibilities are
-    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, healthRecords: Record<EntityId, Health>, combat: DurableObjectNamespace) {
+    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, healthRecords: Record<EntityId, Health>, combat: DurableObjectNamespace, itemHoarder: ItemHoarder) {
         this.commands = [];
         this.map = map;
         this.positionKeeper = positionKeeper;
@@ -33,6 +34,7 @@ export class CommandQueue {
         this.npcs = npcs;
         this.healthRecords = healthRecords;
         this.combat = combat;
+        this.itemHoarder = itemHoarder;
     }
 
     size() { return this.commands.length }
@@ -177,9 +179,10 @@ export class CommandQueue {
                             // TODO: increase experience of player
 
                             // drop loot
-                            const itemId = uuidv4();
+                            const position = damage.position;
+                            const item = this.itemHoarder.create(this.map.id, position);
                             this.positionKeeper.findDropWitnesses(damage.position, players, (otherPlayerId) => {
-                                this.eventBuilder.pushItemDrop(otherPlayerId, damage.position, itemId);
+                                this.eventBuilder.pushItemDrop(otherPlayerId, damage.position, item);
                             });
                         }
                     });
@@ -257,10 +260,13 @@ export class CommandQueue {
                     // read client action
                     const pickup: PickupCommand = command.action(new PickupCommand());
 
-                    // TODO: update game state
-                    // console.log("player with id " + entityId + " picked up " + uuidStringify(pickup.idArray()!))
+                    // update game state
+                    const item: ItemDrop = await this.itemHoarder.pickup(this.map.id, uuidStringify(pickup.idArray()!));
 
                     // inform other players
+                    this.positionKeeper.findDropWitnesses(item.position, players, (otherPlayerId) => {
+                        this.eventBuilder.pushItemPickup(otherPlayerId, item, publicCharacterId!)
+                    });
                     break;
                 }
             }

@@ -27,4 +27,5 @@ const worker: ExportedHandler<Bindings> = {
 export { Map } from "./durable-objects/map";
 export { Combat } from "./durable-objects/combat";
 export { Character } from "./durable-objects/character";
+export { Item } from "./durable-objects/item";
 export default worker;

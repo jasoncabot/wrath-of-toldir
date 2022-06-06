@@ -28,6 +28,7 @@ table SpawnCommand {
 }
 
 table PickupCommand {
+    // id of the item being picked up
     id: [uint8];
 }
 

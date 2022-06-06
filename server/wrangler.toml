@@ -11,7 +11,8 @@ compatibility_flags = []
 bindings = [
   { name = "MAP", class_name = "Map" },
   { name = "COMBAT", class_name = "Combat" },
-  { name = "CHARACTER", class_name = "Character" }
+  { name = "CHARACTER", class_name = "Character" },
+  { name = "ITEM", class_name = "Item" }
 ]
 
 [build]
@@ -37,6 +38,10 @@ new_classes = ["Combat"]
 tag = "v3"
 new_classes = ["Character"]
 
+[[migrations]]
+tag = "v4"
+new_classes = ["Item"]
+
 [vars]
 FRONTEND_URI="http://0.0.0.0:8080"
 
@@ -48,7 +53,8 @@ vars = { FRONTEND_URI = "https://wot.jasoncabot.com" }
 bindings = [
   { name = "MAP", class_name = "Map" },
   { name = "COMBAT", class_name = "Combat" },
-  { name = "CHARACTER", class_name = "Character" }
+  { name = "CHARACTER", class_name = "Character" },
+  { name = "ITEM", class_name = "Item" },
 ]
 
 [[env.production.migrations]]
@@ -62,3 +68,7 @@ new_classes = ["Combat"]
 [[env.production.migrations]]
 tag = "v3"
 new_classes = ["Character"]
+
+[[env.production.migrations]]
+tag = "v4"
+new_classes = ["Item"]

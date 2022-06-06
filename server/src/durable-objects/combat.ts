@@ -102,7 +102,7 @@ export class Combat implements DurableObject {
         // TODO: these shouldn't be this random
         const attack = Math.floor(Math.random() * 19) + 1;
         const defence = Math.floor(Math.random() * 19) + 1;
-        const hp = Math.floor(Math.random() * 500);
+        const hp = Math.floor(Math.random() * 100);
 
         this.state.storage.put("attack", attack);
         this.state.storage.put("defence", defence);
