@@ -32,14 +32,13 @@ const App = () => {
     switch (data.state) {
       case 'initial': {
         return (
-          <section className="body-font">
+          <section className="bg-white m-8 rounded-lg px-6 py-8 ring-1 ring-slate-900/5 shadow-xl">
+            <h1 className='font-medium leading-tight text-5xl mt-0 mb-2'>Wrath of Toldir</h1>
             <p className="mb-8 leading-relaxed">
-              I'm building an MMORPG. It's <a href="https://github.com/jasoncabot/wrath-of-toldir">open source</a>, under heavy development and likely to be a <a href="https://www.gamedev.net/blog/355/entry-2250155-why-you-shouldnt-be-making-an-mmo/">terrible idea</a>.
-              <br />
-              However you're more than welcome to poke around
+              An <a className='underline' href="https://github.com/jasoncabot/wrath-of-toldir">open source</a>, cross-platform and mobile-friendly basic MMORPG under heavy development.
             </p>
             <div className="flex justify-center">
-              <button onClick={() => onPlayNow()} className="inline-flex text-white bg-indigo-500 border-0 py-2 px-6 focus:outline-none hover:bg-indigo-600 rounded text-lg">Play now</button>
+              <button onClick={() => onPlayNow()} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Play now</button>
             </div>
           </section>
         )

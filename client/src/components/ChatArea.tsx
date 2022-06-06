@@ -58,19 +58,19 @@ export const ChatArea = () => {
     }, []);
 
     return (
-        <div className="flex flex-1 flex-col pl-3" style={{ minHeight: '255px' }}>
-            <ol className='font-light flex-1 basis-0 text-xs overflow-y-scroll' ref={chatMessages}>
+        <div className="flex flex-1 flex-col pl-3" style={{ minHeight: '255px',maxWidth: '576px' }}>
+            <ol className='bg-slate-200 rounded-xl font-light flex-1 basis-0 text-xs overflow-y-scroll p-1' ref={chatMessages}>
             </ol>
             <form className='flex items-center justify-between w-full' autoComplete='off' onSubmit={onSend}>
                 <input type="text"
                     ref={chatMessage}
                     maxLength={120}
-                    className="bg-slate-200	block w-full py-2 pl-4 mr-3 mt-3 rounded-full outline-none md:text-xs text-l"
+                    className="bg-slate-200	block w-full py-2 pl-4 mr-3 mt-3 rounded-xl outline-none md:text-xs text-l"
                     onFocus={() => document.dispatchEvent(new CustomEvent('chat-dialog-focused'))}
                     onBlur={() => document.dispatchEvent(new CustomEvent('chat-dialog-blurred'))}
                     name="message" />
                 <button type="submit">
-                    <svg className="mt-3 mr-3 w-5 h-5 origin-center transform rotate-90"
+                    <svg className="mt-3 mr-3 w-5 h-5 origin-center transform rotate-90 text-blue-500 hover:blue-700"
                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path
                             d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />

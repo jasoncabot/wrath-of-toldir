@@ -40,7 +40,11 @@ export const CharacterList = (props: { characters: PlayableCharacter[], onSelect
     }
 
     return (
-        <div className='flex-col m-auto p-auto'>
+        <div className='flex-col m-auto p-8'>
+            <h1 className='font-large text-xl mb-3'>Select or create your character</h1>
+            <p className='mb-3'>
+                You can create up to 5 permanent characters.
+            </p>
             <div className="flex overflow-x-scroll pb-10 hide-scroll-bar">
                 {characters.map(character => <CharacterListItem key={character.id} character={character} onSelected={onSelected} />)}
                 <CharacterCreate onNewCharacter={onNewCharacter} />
