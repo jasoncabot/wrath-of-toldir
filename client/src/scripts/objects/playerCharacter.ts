@@ -158,7 +158,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
       speed: { min: -800, max: 800 },
       angle: { min: 0, max: 360 },
       scale: { start: 0.3, end: 0 },
-      blendMode: Phaser.BlendModes.MULTIPLY,
+      blendMode: Phaser.BlendModes.COLOR_BURN,
       lifespan: 120,
       gravityY: 800
     });
