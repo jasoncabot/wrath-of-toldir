@@ -235,11 +235,11 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
       this.weaponSprite.setPosition(this.getCenter().x, this.getCenter().y);
     }
 
-    this.nameBadge.setPosition(this.getCenter().x, this.getBottomCenter().y).setDepth(this.depth + 1);
+    this.nameBadge.setPosition(this.getCenter().x, this.getBottomCenter().y + 3).setDepth(this.depth + 1);
     if (this.speechBubble.visible) {
       this.speechBubble.setPosition(this.getCenter().x, this.getTopCenter().y).setDepth(this.depth + 2);
     }
-    this.healthBar.setPosition(this.getCenter().x, this.getBottomCenter().y + 18).setDepth(this.nameBadge.depth - 1);
+    this.healthBar.setPosition(this.getCenter().x, this.getBottomCenter().y + 3).setDepth(this.nameBadge.depth - 1);
   }
 
   destroy(fromScene?: boolean): void {
