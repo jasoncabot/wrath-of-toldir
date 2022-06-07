@@ -109,14 +109,53 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  addExpGain(text: string) {
+    const floatingExpGain = this.scene.add.text(
+      Phaser.Math.Between(this.getCenter().x - 8, this.getCenter().x + 8),
+      this.getTopCenter().y,
+      text, {
+      color: '#91DB69',
+      fontSize: '14px',
+      fontFamily: "'Press Start 2P'"
+    }).setDepth(this.depth + 1)
+      .setOrigin(0.5, 1);
+
+    const tweens = this.scene.tweens;
+
+    this.tint = 0x91DB69;
+    this.scene.time.delayedCall(250, () => this.clearTint());
+
+    tweens.add({
+      targets: floatingExpGain,
+      y: floatingExpGain.y - 10,
+      ease: "Sine.easeIn",
+      duration: 750,
+      yoyo: false,
+      callbackScope: this,
+      onComplete: () => {
+        tweens.add({
+          targets: floatingExpGain,
+          alpha: 0,
+          ease: "Sine.easeOut",
+          duration: 500,
+          yoyo: false,
+          callbackScope: this,
+          onComplete: () => {
+            floatingExpGain.destroy();
+          }
+        });
+      }
+    });
+    return floatingExpGain;
+  }
+
   addDamage(amount: number, health: number) {
     this.healthBar.setHealth(health);
-    const tint = this.tint;
     this.tint = 0xAE2334;
 
     const damage = this.scene.add.text(
-      Phaser.Math.Between(this.getCenter().x - 4, this.getCenter().x + 4),
-      Phaser.Math.Between(this.getCenter().y - 4, this.getCenter().y + 4),
+      Phaser.Math.Between(this.getCenter().x - 8, this.getCenter().x + 8),
+      Phaser.Math.Between(this.getCenter().y - 8, this.getCenter().y + 8),
       amount.toString(), {
       color: '#EF3B3C',
       fontSize: '16px',
@@ -134,7 +173,7 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
       yoyo: false,
       callbackScope: this,
       onComplete: () => {
-        this.tint = tint;
+        this.clearTint();
         tweens.add({
           targets: damage,
           alpha: 0,

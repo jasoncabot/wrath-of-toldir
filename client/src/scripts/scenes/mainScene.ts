@@ -478,6 +478,12 @@ export default class MainScene extends Phaser.Scene {
           if (event.state() == DamageState.Dead) {
             enemy.explode();
             this.gridEngine.removeCharacter(event.key().toString());
+            // TODO: wait for server to tell us what we gained
+            const expgain = Phaser.Math.Between(10, 40);
+            this.hudDataSource.experience.current += expgain;
+            this.experienceBar.onDataSourceUpdated(this.hudDataSource);
+            const expSprite = this.player.addExpGain(`+${expgain}`);
+            this.interfaceCamera.ignore(expSprite);
           }
           break;
         }
