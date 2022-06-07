@@ -520,6 +520,7 @@ export default class MainScene extends Phaser.Scene {
     this.currentState = MapSceneState.INITIAL;
 
     // Remove old sprites
+    this.cameras.main.fadeOut(750);
     [this.map, this.gridEngine].forEach(sprite => { if (sprite) { sprite.destroy() } });
     this.entities.forEach(entity => entity.destroy());
 
@@ -533,6 +534,7 @@ export default class MainScene extends Phaser.Scene {
   }
 
   transitionToReady(event: MapJoinedEvent) {
+    this.cameras.main.fadeIn(750);
     const map: TileMap = event.tilemap()!
 
     // create our client-side representation of this map
