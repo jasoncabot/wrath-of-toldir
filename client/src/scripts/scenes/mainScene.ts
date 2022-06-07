@@ -498,7 +498,14 @@ export default class MainScene extends Phaser.Scene {
           tile.properties["item"] = item;
 
           // TODO figure out the global ids of items properly
-          this.map.putTileAt(item.tileTexture(), event.pos()!.x(), event.pos()!.y(), false, "item1");
+          const itemTile = this.map.putTileAt(item.tileTexture(), event.pos()!.x(), event.pos()!.y(), false, "item1");
+          itemTile.alpha = 0;
+          this.tweens.add({
+            targets: itemTile,
+            alpha: 1,
+            ease: "Sine.easeIn",
+            duration: 750
+          });
           break;
         }
         case Update.ItemCollectedEvent: {
