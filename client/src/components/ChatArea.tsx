@@ -58,7 +58,7 @@ export const ChatArea = () => {
     }, []);
 
     return (
-        <div className="flex flex-1 flex-col pl-3" style={{ minHeight: '255px',maxWidth: '576px' }}>
+        <div className="flex flex-1 flex-col p-3" style={{ minHeight: '255px',maxWidth: '576px' }}>
             <ol className='bg-slate-200 rounded-xl font-light flex-1 basis-0 text-xs overflow-y-scroll p-1' ref={chatMessages}>
             </ol>
             <form className='flex items-center justify-between w-full' autoComplete='off' onSubmit={onSend}>
