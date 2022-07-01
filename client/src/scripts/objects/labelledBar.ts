@@ -18,6 +18,7 @@ const textForType = (type: LabelledBarType, data: LabelledBarDataSource) => {
         case LabelledBarType.Health: return `${data.health.current}/${data.health.max}`;
         case LabelledBarType.Magic: return `${data.magic.current}/${data.magic.max}`;
         case LabelledBarType.Experience: return `${data.experience.level} (${data.experience.current}/${data.experience.max})`;
+        default: ((_: never) => { throw new Error("Should handle every state") })(type);
     }
 }
 
@@ -35,7 +36,7 @@ export default class LabelledBar extends Phaser.GameObjects.Graphics {
         return this;
     }
 
-    constructor(scene: MainScene, x: number, y: number, type: LabelledBarType, dataSource: LabelledBarDataSource) {
+    constructor(scene: MainScene, x: number, y: number, type: LabelledBarType) {
         super(scene, { x, y });
 
         this.labelledBarType = type;
@@ -46,7 +47,7 @@ export default class LabelledBar extends Phaser.GameObjects.Graphics {
 
         scene.add.existing(this);
 
-        this.label = scene.add.text(x + 3, y + 6, textForType(type, dataSource), { color: '#ffffff', fontSize: '8px', fontFamily: "'Press Start 2P'" })
+        this.label = scene.add.text(x + 3, y + 6, "", { color: '#ffffff', fontSize: '8px', fontFamily: "'Press Start 2P'" })
             .setOrigin(0, 0);
 
         this.border = this.scene.add.graphics({ x, y });
@@ -69,6 +70,7 @@ export default class LabelledBar extends Phaser.GameObjects.Graphics {
             case LabelledBarType.Experience:
                 this.fillGradientStyle(0X1FBA73, 0X1FBA73, 0X229165, 0X229165, 1);
                 break;
+            default: ((_: never) => { throw new Error("Should handle every state") })(this.labelledBarType);
         }
         this.fillRect(0, 0, 155, 18);
     }
@@ -85,6 +87,7 @@ export default class LabelledBar extends Phaser.GameObjects.Graphics {
             case LabelledBarType.Experience:
                 this.setScale(dataSource.experience.current / dataSource.experience.max, 1);
                 break;
+            default: ((_: never) => { throw new Error("Should handle every state") })(this.labelledBarType);
         }
     }
 }

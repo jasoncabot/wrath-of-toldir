@@ -1,7 +1,7 @@
 import { CharacterData, Direction } from "grid-engine";
 import { textureForEntity, textureMap } from "../../assets/spritesheets/Sprites";
 import { EntityInteraction } from "../../models/entities";
-import { Elevation, Entity } from "../../models/events";
+import { Character, Elevation, Entity } from "../../models/events";
 import { MainScene } from "../scenes";
 import FloatingHealthBar from "./floatingHealthBar";
 import Weapon from "./weapon";
@@ -10,6 +10,7 @@ export const keyForElevation = (elevation: Elevation) => {
   switch (elevation) {
     case Elevation.Unknown: return undefined;
     case Elevation.Level1: return "charLevel1";
+    default: ((_: never) => { throw new Error("Should handle every state") })(elevation);
   }
 }
 
@@ -29,7 +30,13 @@ export const normalisedFacingDirection = (direction: Direction) => {
     case Direction.DOWN_RIGHT: return Direction.RIGHT;
     case Direction.DOWN: return Direction.DOWN;
     case Direction.DOWN_LEFT: return Direction.LEFT;
+    default: ((_: never) => { throw new Error("Should handle every state") })(direction);
   }
+}
+
+export interface NamedEntity {
+  name: string
+  entity: Entity
 }
 
 export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
@@ -44,7 +51,10 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
   healthBar: FloatingHealthBar;
   interaction: EntityInteraction;
 
-  constructor(scene: MainScene, name: string, entity: Entity) {
+  constructor(scene: MainScene, character: NamedEntity) {
+    const name = character.name;
+    const entity = character.entity;
+
     super(scene, 0, 0, textureForEntity(entity.texture()), 0);
     this.identifier = entity.key().toString();
     this.interaction = entity.interaction();
@@ -106,6 +116,10 @@ export default class PlayerCharacter extends Phaser.Physics.Arcade.Sprite {
       case EntityInteraction.WeaponShop:
         console.log("Opening weapon shop with key " + target.identifier);
         break;
+      case EntityInteraction.Default:
+        console.log("Default interaction with target " + target.identifier);
+        break;
+      default: ((_: never) => { throw new Error("Should handle every state") })(targetAction);
     }
   }
 

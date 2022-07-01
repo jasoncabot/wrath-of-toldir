@@ -4,8 +4,10 @@ import { fetchCharacters } from '../scripts/services/characters';
 import { CharacterList, PlayableCharacter } from './CharacterList';
 import GameContainer from './GameContainer';
 
+type AppState = 'initial' | 'loading' | 'loaded';
+
 const App = () => {
-  const [data, setData] = useState({ state: 'initial', characters: [] });
+  const [data, setData] = useState<{ state: AppState, characters: any[] }>({ state: 'initial', characters: [] });
   const [selected, setSelected] = useState<PlayableCharacter | undefined>(undefined);
 
   const onPlayNow = () => {
@@ -51,7 +53,7 @@ const App = () => {
           <CharacterList characters={data.characters} onSelected={onCharacterSelected} />
         );
       }
-      default: return <div />
+      default: ((_: never) => { throw new Error("Should handle every state") })(data.state);
     }
   }
 

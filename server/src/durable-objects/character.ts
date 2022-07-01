@@ -104,6 +104,8 @@ export class Character implements DurableObject {
                     }), { status: 400 });
                 }
             }
+
+            default: ((_: never) => { throw new Error("Should handle every state") })(action);
         }
     }
 

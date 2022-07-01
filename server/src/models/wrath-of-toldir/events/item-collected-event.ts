@@ -2,6 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { Item } from '../../wrath-of-toldir/items/item';
 import { Vec2 } from '../../wrath-of-toldir/vec2';
 
 
@@ -48,8 +49,13 @@ idArray():Uint8Array|null {
   return offset ? new Uint8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
+item(obj?:Item):Item|null {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? (obj || new Item()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
 static startItemCollectedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(4);
 }
 
 static addKey(builder:flatbuffers.Builder, key:number) {
@@ -74,6 +80,10 @@ static createIdVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):fla
 
 static startIdVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(1, numElems, 1);
+}
+
+static addItem(builder:flatbuffers.Builder, itemOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, itemOffset, 0);
 }
 
 static endItemCollectedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

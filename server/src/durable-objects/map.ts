@@ -45,7 +45,7 @@ export class Map implements DurableObject {
         this.npcs = {};
         this.eventBuilder = new EventBuilder();
         this.positionKeeper = new PositionKeeper(this.state.storage, this.env.MAP, this.env.CHARACTER);
-        this.itemHoarder = new ItemHoarder(this.env.ITEM);
+        this.itemHoarder = new ItemHoarder(this.env.ITEM, env.dependencies.randomiser);
         this.healthRecords = {};
     }
 
@@ -54,8 +54,8 @@ export class Map implements DurableObject {
         this.mapData = loadMapData(mapId);
         // TODO: slice and dice these dependencies a bit better, perhaps put them in a context
         this.positionKeeper.updateWithMap(this.mapData);
-        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.itemHoarder);
-        this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT);
+        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.itemHoarder, this.env.dependencies.randomiser);
+        this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.env.dependencies.randomiser);
     }
 
     async fetch(request: Request) {
@@ -142,15 +142,12 @@ export class Map implements DurableObject {
                     });
                 }
 
-                default:
-                    return new Response("Not found", { status: 404 });
+                default: ((_: never) => { throw new Error("Should handle every state") })(action);
             }
         });
     }
 
     async onGameTick() {
-        const start = new Date().getTime();
-
         // update game state
         await this.commandQueue.process(this.tickCount++);
         await this.ai.process(this.tickCount);
@@ -178,11 +175,6 @@ export class Map implements DurableObject {
             // no one is connected, no point to carry on ticking
             console.log(`[id:${this.mapData!.id}] [tick:${this.tickCount}] No players are connected, shutting down game tick ...`);
             this.onGameEmpty();
-        }
-
-        const elapsed = (new Date().getTime() - start);
-        if (elapsed > TICK_RATE * 0.8) {
-            console.warn(`[id:${this.mapData?.id}] [tick:${this.tickCount}] [queue-length:${this.commandQueue.size()}] took too much time (${elapsed}ms) to process`);
         }
     }
 

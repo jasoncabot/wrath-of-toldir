@@ -2,14 +2,15 @@ import { AttackDamageResult, AttackResult, SpawnResult } from "@/durable-objects
 import { Connection } from "@/durable-objects/map";
 import { MagicAttack, NormalAttack } from "@/models/attacks";
 import { Action, AttackCommand, AttackData, ChatCommand, EntityTexture, JoinCommand, MoveCommand, PickupCommand, SpawnCommand } from "@/models/commands";
-import { Elevation } from "@/models/events";
+import { Elevation, Item } from "@/models/events";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { stringify as uuidStringify, v4 as uuidv4 } from 'uuid';
 import { Entity, EntityId, Health, MapTransition, PlayerId, ReceivedCommand, TiledJSON } from "../game";
 import { EventBuilder } from "./event-builder";
 import { ItemDrop, ItemHoarder } from "./item-hoarder";
-import { Position, PositionKeeper } from "./position-keeper";
+import { PickupWitnessType, Position, PositionKeeper } from "./position-keeper";
+import Randomiser from "./randomiser";
 
 export type CharacterDetailLookup = (playerId: PlayerId, characterId: PlayerId) => Promise<{ name: string, texture: EntityTexture }>;
 
@@ -23,9 +24,10 @@ export class CommandQueue {
     private healthRecords: Record<EntityId, Health>;
     private combat: DurableObjectNamespace;
     private itemHoarder: ItemHoarder;
+    private randomiser: Randomiser;
 
     // TODO: This is horrid - still need to think about how to structure this and what it's responsibilities are
-    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, healthRecords: Record<EntityId, Health>, combat: DurableObjectNamespace, itemHoarder: ItemHoarder) {
+    constructor(map: TiledJSON, positionKeeper: PositionKeeper, eventBuilder: EventBuilder, connections: Record<PlayerId, Connection>, npcs: Record<EntityId, Entity>, healthRecords: Record<EntityId, Health>, combat: DurableObjectNamespace, itemHoarder: ItemHoarder, randomiser: Randomiser) {
         this.commands = [];
         this.map = map;
         this.positionKeeper = positionKeeper;
@@ -35,6 +37,7 @@ export class CommandQueue {
         this.healthRecords = healthRecords;
         this.combat = combat;
         this.itemHoarder = itemHoarder;
+        this.randomiser = randomiser;
     }
 
     size() { return this.commands.length }
@@ -104,7 +107,7 @@ export class CommandQueue {
 
                     // update game state
                     // a key represents a characterId on a map and is a public reference to a particular entity
-                    const publicCharId = Math.floor(Math.random() * 2147483647);
+                    const publicCharId = this.randomiser.between(0, 2147483646);
                     this.connections[entityId].publicCharacterId = publicCharId;
                     await this.positionKeeper.spawnEntityAtFreePosition(entityId);
                     const character = this.connections[entityId].character;
@@ -221,7 +224,7 @@ export class CommandQueue {
 
                     // update game state
                     const npcId = uuidv4();
-                    const npcKey = Math.floor(Math.random() * 2147483647);
+                    const npcKey = this.randomiser.between(0, 2147483646);
                     const position: Position = {
                         x: spawn.pos()!.x(),
                         y: spawn.pos()!.y(),
@@ -258,14 +261,17 @@ export class CommandQueue {
 
                 case Action.PickupCommand: {
                     // read client action
-                    const pickup: PickupCommand = command.action(new PickupCommand());
+                    const pickupCommand: PickupCommand = command.action(new PickupCommand());
 
                     // update game state
-                    const item: ItemDrop = await this.itemHoarder.pickup(this.map.id, uuidStringify(pickup.idArray()!));
+                    // TODO: handle someone else has already picked this up!
+                    const { item, position } = (await this.itemHoarder.pickup(this.map.id, uuidStringify(pickupCommand.idArray()!))!)!;
 
                     // inform other players
-                    this.positionKeeper.findDropWitnesses(item.position, players, (otherPlayerId) => {
-                        this.eventBuilder.pushItemPickup(otherPlayerId, item, publicCharacterId!)
+                    this.positionKeeper.findPickupWitnesses(entityId, position, players, (otherPlayerId, details) => {
+                        // Should these players be sent the full details or just the position that the item was picked up from
+                        // this may have to change if we want to support more than 1 item on the ground in each position
+                        this.eventBuilder.pushItemPickup(otherPlayerId, item, publicCharacterId!, position, details);
                     });
                     break;
                 }
@@ -280,7 +286,9 @@ export class CommandQueue {
     async performAttack(playerId: PlayerId, attack: AttackCommand) {
         // TODO: Move this to another object (like position keeper)
         let facingPosition: Position = this.positionKeeper.getEntityPosition(playerId);
-        switch (attack.dataType()) {
+        const type = attack.dataType()!;
+        switch (type) {
+            case AttackData.NONE: break;
             case AttackData.NormalAttack: {
                 const atk = attack.data(new NormalAttack()) as NormalAttack;
                 facingPosition = this.positionKeeper.getFacingPosition(playerId, atk.facing());
@@ -289,6 +297,7 @@ export class CommandQueue {
                 const atk = attack.data(new MagicAttack()) as MagicAttack;
                 facingPosition = { x: atk.targetPos()!.x(), y: atk.targetPos()!.y(), z: Elevation.Level1 };
             } break;
+            default: ((_: never) => { throw new Error("Should handle every state") })(type);
         }
 
         const targetEntityIds = this.positionKeeper.getEntitiesAtPosition(facingPosition, true);

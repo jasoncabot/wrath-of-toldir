@@ -1,4 +1,5 @@
 include "maps.fbs";
+include "items.fbs";
 
 namespace WrathOfToldir;
 
@@ -104,4 +105,12 @@ struct PrivateStats {
     exp: uint32;
     max_exp: uint32;
     level: byte;
+}
+
+table Character {
+    name: string;
+    player: WrathOfToldir.Entity;
+    stats: WrathOfToldir.PrivateStats;
+    gold: uint32;
+    items: [WrathOfToldir.Items.Item];
 }

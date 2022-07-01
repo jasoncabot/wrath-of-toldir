@@ -30,6 +30,11 @@ interface Bounds {
     left: number
 }
 
+export enum PickupWitnessType {
+    Basic,
+    Detailed
+}
+
 const Directions = [Direction.NONE, Direction.LEFT, Direction.UP_LEFT, Direction.UP, Direction.UP_RIGHT, Direction.RIGHT, Direction.DOWN_RIGHT, Direction.DOWN, Direction.DOWN_LEFT];
 
 type EntityIndex = Set<EntityId>[];
@@ -42,6 +47,7 @@ export const keyForElevation = (elevation: Elevation) => {
     switch (elevation) {
         case Elevation.Unknown: return undefined;
         case Elevation.Level1: return "charLevel1";
+        default: ((_: never) => { throw new Error("Should handle every state") })(elevation);
     }
 }
 
@@ -205,6 +211,7 @@ export class PositionKeeper {
             case Direction.DOWN_RIGHT: return { ...position, x: position.x + 1, y: position.y + 1 };
             case Direction.DOWN: return { ...position, y: position.y + 1 };
             case Direction.DOWN_LEFT: return { ...position, x: position.x - 1, y: position.y - 1 };
+            default: ((_: never) => { throw new Error("Should handle every state") })(direction);
         }
     }
 
@@ -340,6 +347,17 @@ export class PositionKeeper {
             const viewBox = this.viewableBounds(otherPlayerId);
             if (!this.inBounds(position, viewBox)) return;
             callback(otherPlayerId);
+        });
+    }
+
+    findPickupWitnesses(entityId: EntityId, position: Position, allPlayerIds: EntityId[], callback: ((id: PlayerId, detailed: PickupWitnessType) => void)) {
+        // everyone within range should see the pickup
+        allPlayerIds.forEach(otherPlayerId => {
+            const viewBox = this.viewableBounds(otherPlayerId);
+            if (!this.inBounds(position, viewBox)) return;
+
+            const details = entityId === otherPlayerId ? PickupWitnessType.Detailed : PickupWitnessType.Basic;
+            callback(otherPlayerId, details);
         });
     }
 }

@@ -2,6 +2,7 @@ import { validMaps } from "@/data/maps";
 import { PlayableCharacter } from "@/durable-objects/character";
 import { MapAction } from "@/durable-objects/map";
 import { PlayerId } from "@/game/game";
+import { notFound } from "@/middleware";
 import { RequestWithUser } from "@/middleware/auth";
 import { Request } from "itty-router";
 import { v4 as uuidv4 } from 'uuid';
@@ -35,7 +36,7 @@ const show = async (request: RequestWithUser, env: Bindings, ctx: ExecutionConte
 const connect = async (request: Request, env: Bindings, ctx: ExecutionContext) => {
     const mapId = (request.params || {}).id;
     const token = (request.query || {}).token;
-    if (!validMaps.has(mapId)) return new Response('Invalid map', { status: 404 });
+    if (!validMaps.has(mapId)) return notFound('Invalid map');
     if (!token) return new Response('Invalid token', { status: 400 });
 
     const id = env.MAP.idFromName(mapId);

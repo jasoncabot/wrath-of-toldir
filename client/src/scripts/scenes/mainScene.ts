@@ -1,11 +1,11 @@
 import { Builder, ByteBuffer } from "flatbuffers";
 import { Direction, GridEngine, Position } from 'grid-engine';
-import { parse as uuidParse } from 'uuid';
+import { parse as uuidParse, stringify as uuidStringify } from 'uuid';
 import { AnimatedSpriteDirectionalFrames, entityTextureNames, textureMap } from "../../assets/spritesheets/Sprites";
 import { ChatMessage } from "../../components/ChatArea";
 import { MagicAttack, NormalAttack } from '../../models/attacks';
 import { Action, JoinCommand, MoveCommand, PickupCommand, SpawnCommand, Vec2 } from '../../models/commands';
-import { AttackData, AttackEvent, DamageState, Item as ItemBuffer, ItemDropEvent, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
+import { AttackData, AttackEvent, DamageState, Item as ItemBuffer, ItemCollectedEvent, ItemDropEvent, ItemTexture, JoinEvent, LeaveEvent, MoveEvent, Update } from '../../models/events';
 import { MapLayer, TileCollision, TileSet } from '../../models/maps';
 import { AttackCommand } from '../../models/wrath-of-toldir/commands/attack-command';
 import { ChatCommand } from '../../models/wrath-of-toldir/commands/chat-command';
@@ -16,11 +16,11 @@ import { EventLog } from '../../models/wrath-of-toldir/events/event-log';
 import { MapChangedEvent } from '../../models/wrath-of-toldir/events/map-changed-event';
 import { MapJoinedEvent } from '../../models/wrath-of-toldir/events/map-joined-event';
 import { TileMap } from '../../models/wrath-of-toldir/maps/tile-map';
-import { DebugText, PlayerCharacter } from '../objects/';
+import { CharacterSheet, DebugText, Inventory, PlayerCharacter } from '../objects/';
 import ActionButton, { ActionButtonSelected, ActionButtonType } from "../objects/actionButton";
 import ChatDialog from '../objects/chatDialog';
 import Item from "../objects/item";
-import LabelledBar, { LabelledBarDataSource, LabelledBarType } from "../objects/labelledBar";
+import LabelledBar, { LabelledBarType } from "../objects/labelledBar";
 import { keyForElevation, normalisedFacingDirection } from '../objects/playerCharacter';
 import Weapon from '../objects/weapon';
 import { DefaultActionTriggered, MovementController, PlayerMovementPlugin } from "../plugins/movementController";
@@ -46,6 +46,7 @@ enum MapSceneState {
   READY
 }
 
+const ITEM_LAYER = "item1";
 export default class MainScene extends Phaser.Scene {
   chatOverlay: ChatDialog;
   commandSequencer: number;
@@ -68,7 +69,8 @@ export default class MainScene extends Phaser.Scene {
   healthBar: LabelledBar;
   magicBar: LabelledBar;
   experienceBar: LabelledBar;
-  hudDataSource: LabelledBarDataSource;
+  inventory: Inventory;
+  characterSheet: CharacterSheet;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -136,16 +138,9 @@ export default class MainScene extends Phaser.Scene {
     this.actionButton2 = new ActionButton(this, 474, 567, ActionButtonType.MagicAttack).setSelected(false).on(ActionButtonSelected, () => onActionButtonSelected(1));
     this.actionButton3 = new ActionButton(this, 523, 567, ActionButtonType.Potion).setSelected(false).on(ActionButtonSelected, () => onActionButtonSelected(2));
 
-    const ds: LabelledBarDataSource = {
-      health: { current: 0, max: 0 },
-      magic: { current: 0, max: 0 },
-      experience: { current: 0, max: 0, level: 0 },
-    };
-    this.hudDataSource = ds;
-
-    this.healthBar = new LabelledBar(this, 12, 504, LabelledBarType.Health, ds).setVisible(false);
-    this.magicBar = new LabelledBar(this, 12, 525, LabelledBarType.Magic, ds).setVisible(false);
-    this.experienceBar = new LabelledBar(this, 12, 546, LabelledBarType.Experience, ds).setVisible(false);
+    this.healthBar = new LabelledBar(this, 12, 504, LabelledBarType.Health).setVisible(false);
+    this.magicBar = new LabelledBar(this, 12, 525, LabelledBarType.Magic).setVisible(false);
+    this.experienceBar = new LabelledBar(this, 12, 546, LabelledBarType.Experience).setVisible(false);
 
     this.chatOverlay = new ChatDialog(this, this.onTextEntered.bind(this));
 
@@ -157,6 +152,10 @@ export default class MainScene extends Phaser.Scene {
     this.input.keyboard.on('keyup', (event: KeyboardEvent) => {
       if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.E) {
         this.chatOverlay.focus();
+      } else if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.C) {
+        this.onCharacterSheetSelected();
+      } else if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.I) {
+        this.onInventorySelected();
       } else if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.ONE) {
         onActionButtonSelected(0);
       } else if (event.keyCode == Phaser.Input.Keyboard.KeyCodes.TWO) {
@@ -166,6 +165,14 @@ export default class MainScene extends Phaser.Scene {
       }
     });
     this.transitionToInitial(currentCharacterRegion());
+  }
+
+  onInventorySelected() {
+    console.log(this.inventory.text());
+  }
+
+  onCharacterSheetSelected() {
+    console.log(this.characterSheet.text());
   }
 
   update() {
@@ -337,13 +344,13 @@ export default class MainScene extends Phaser.Scene {
 
   pickupItem(tile: Phaser.Tilemaps.Tile) {
     // Pickup this item on the client
-    const item = tile.properties["item"] as Item;
-    this.map.putTileAt(-1, tile.x, tile.y, false, "item1");
+    const itemId = tile.properties["item"] as string;
+    this.map.removeTileAt(tile.x, tile.y, true, false, ITEM_LAYER);
     delete tile.properties["item"];
 
     // Pickup this item on the server
     let builder = new Builder(128);
-    const idOffset = ItemBuffer.createIdVector(builder, Uint8Array.from(uuidParse(item.id)));
+    const idOffset = PickupCommand.createIdVector(builder, Uint8Array.from(uuidParse(itemId)));
     const pickup = PickupCommand.createPickupCommand(builder, idOffset);
     Command.startCommand(builder);
     Command.addSeq(builder, ++this.commandSequencer);
@@ -403,12 +410,15 @@ export default class MainScene extends Phaser.Scene {
         // TODO: apply a potion if we have one
         break;
       }
+      default: ((_: never) => { throw new Error("Should handle every state") })(type);
     }
   }
 
   applyUpdate(update: EventLog) {
     for (let i = 0; i < update.eventsLength(); i++) {
-      switch (update.eventsType(i)) {
+      const type = update.eventsType(i)!;
+      switch (type) {
+        case Update.NONE: { break; }
         case Update.MoveEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const move: MoveEvent = update.events(i, new MoveEvent());
@@ -426,7 +436,10 @@ export default class MainScene extends Phaser.Scene {
         case Update.JoinEvent: {
           if (this.currentState !== MapSceneState.READY) break;
           const join: JoinEvent = update.events(i, new JoinEvent());
-          const pc = new PlayerCharacter(this, join.name()!, join.entity()!);
+          const pc = new PlayerCharacter(this, {
+            name: join.name()!,
+            entity: join.entity()!
+          });
           this.gridEngine.addCharacter(pc.gridEngineCharacterData);
           pc.playStandAnimation(this.gridEngine.getFacingDirection(join.entity()!.key().toString()));
           this.entities.push(pc);
@@ -444,7 +457,8 @@ export default class MainScene extends Phaser.Scene {
           const attack: AttackEvent = update.events(i, new AttackEvent());
 
           const key = attack.key().toString();
-          switch (attack.dataType()) {
+          const type = attack.dataType()!;
+          switch (type) {
             case AttackData.NormalAttack:
               const normal: NormalAttack = attack.data(new NormalAttack());
               const normalDirection = Directions[normal.facing()];
@@ -456,6 +470,9 @@ export default class MainScene extends Phaser.Scene {
               const magic: MagicAttack = attack.data(new MagicAttack());
               console.log(`Attacking target with key ${magic.targetKey()} at (${magic.targetPos()!.x()},${magic.targetPos()!.y()}) with magic`);
               break;
+            case AttackData.NONE:
+              break;
+            default: ((_: never) => { throw new Error("Should handle every state") })(type);
           }
 
           break;
@@ -480,8 +497,8 @@ export default class MainScene extends Phaser.Scene {
             this.gridEngine.removeCharacter(event.key().toString());
             // TODO: wait for server to tell us what we gained
             const expgain = Phaser.Math.Between(10, 40);
-            this.hudDataSource.experience.current += expgain;
-            this.experienceBar.onDataSourceUpdated(this.hudDataSource);
+            this.characterSheet.experience.current += expgain;
+            this.experienceBar.onDataSourceUpdated(this.characterSheet);
             const expSprite = this.player.addExpGain(`+${expgain}`);
             this.interfaceCamera.ignore(expSprite);
           }
@@ -500,11 +517,10 @@ export default class MainScene extends Phaser.Scene {
           const event: ItemDropEvent = update.events(i, new ItemDropEvent());
           const charLayer = this.gridEngine.getCharLayer(this.player.identifier);
           const tile = this.map.getTileAt(event.pos()!.x(), event.pos()!.y(), true, charLayer);
-          const item = new Item(event.item()!);
-          tile.properties["item"] = item;
+          const itemId = uuidStringify(event.idArray()!);
+          tile.properties["item"] = itemId;
 
-          // TODO figure out the global ids of items properly
-          const itemTile = this.map.putTileAt(item.tileTexture(), event.pos()!.x(), event.pos()!.y(), false, "item1");
+          const itemTile = this.map.putTileAt(Item.mapTileForTemplate(event.template()), event.pos()!.x(), event.pos()!.y(), false, ITEM_LAYER);
           itemTile.alpha = 0;
           this.tweens.add({
             targets: itemTile,
@@ -515,9 +531,17 @@ export default class MainScene extends Phaser.Scene {
           break;
         }
         case Update.ItemCollectedEvent: {
-          // TODO: someone else picked this item up - so remove it
+          const event: ItemCollectedEvent = update.events(i, new ItemCollectedEvent());
+          if (event.key()!.toString() == this.player.identifier) {
+            const item = new Item(event.item()!);
+            this.inventory.gain(item);
+          } else {
+            // we could also check event.id() here to ensure it's the correct thing removed
+            this.map.removeTileAt(event.pos()!.x(), event.pos()!.y(), true, false, ITEM_LAYER);
+          }
           break;
         }
+        default: ((_: never) => { throw new Error("Should handle every state") })(type);
       }
     }
   }
@@ -624,21 +648,18 @@ export default class MainScene extends Phaser.Scene {
         tileDisplayLayer = this.map.createLayer(layer.key()!, tilesetLayers, 0, 0);
       }
       this.interfaceCamera.ignore(tileDisplayLayer);
-
     }
 
-    this.debugText.prefix = `(${event.player()!.pos()!.x()},${event.player()!.pos()!.y()})`;
-    this.player = new PlayerCharacter(this, event.name()!, event.player()!);
+    this.debugText.prefix = `(${event.character()!.player()!.pos()!.x()},${event.character()!.player()!.pos()!.y()})`;
+    this.player = new PlayerCharacter(this, {
+      name: event.character()!.name()!,
+      entity: event.character()!.player()!
+    });
+    this.inventory = new Inventory(event.character()!);
+    this.characterSheet = new CharacterSheet(event.character()!);
     this.entities.push(this.player);
 
-    this.hudDataSource.health.current = event.player()!.hp()!;
-    this.hudDataSource.health.max = event.player()!.maxHp()!;
-    this.hudDataSource.magic.current = event.stats()!.mp()!;
-    this.hudDataSource.magic.max = event.stats()!.maxMp()!;
-    this.hudDataSource.experience.current = event.stats()!.exp()!;
-    this.hudDataSource.experience.max = event.stats()!.maxExp()!;
-    this.hudDataSource.experience.level = event.stats()!.level()!;
-    [this.healthBar, this.magicBar, this.experienceBar].forEach(bar => bar.setVisible(true).onDataSourceUpdated(this.hudDataSource));
+    [this.healthBar, this.magicBar, this.experienceBar].forEach(bar => bar.setVisible(true).onDataSourceUpdated(this.characterSheet));
 
     this.cameras.main.startFollow(this.player, true);
     this.cameras.main.setFollowOffset(-this.player.width, -this.player.height);
@@ -652,7 +673,10 @@ export default class MainScene extends Phaser.Scene {
 
     for (let i = 0; i < event.npcsLength(); i++) {
       const npc = event.npcs(i)!;
-      const sprite = new PlayerCharacter(this, "", npc);
+      const sprite = new PlayerCharacter(this, {
+        name: "",
+        entity: npc
+      });
       this.entities.push(sprite);
       this.gridEngine.addCharacter(sprite.gridEngineCharacterData);
       sprite.playStandAnimation(sprite.gridEngineCharacterData.facingDirection!);

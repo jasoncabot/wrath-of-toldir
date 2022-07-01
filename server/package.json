@@ -16,6 +16,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^3.10.0",
     "@types/jest": "^27.5.1",
+    "@types/random-seed": "^0.3.3",
     "esbuild": "^0.14.39",
     "jest": "^28.1.0",
     "jest-environment-miniflare": "^2.0.0",
@@ -28,6 +29,7 @@
     "@types/uuid": "^8.3.4",
     "flatbuffers": "^2.0.6",
     "itty-router": "^2.5.2",
+    "random-seed": "^0.3.0",
     "short-unique-id": "^4.4.4",
     "uuid": "^8.3.2"
   }

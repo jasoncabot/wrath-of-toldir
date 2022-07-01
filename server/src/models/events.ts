@@ -1,4 +1,5 @@
 export { AttackData, unionToAttackData, unionListToAttackData } from './wrath-of-toldir/attacks/attack-data';
+export { Character } from './wrath-of-toldir/character';
 export { Elevation } from './wrath-of-toldir/elevation';
 export { Entity } from './wrath-of-toldir/entity';
 export { AttackEvent } from './wrath-of-toldir/events/attack-event';
@@ -14,6 +15,6 @@ export { MapJoinedEvent } from './wrath-of-toldir/events/map-joined-event';
 export { MoveEvent } from './wrath-of-toldir/events/move-event';
 export { Update, unionToUpdate, unionListToUpdate } from './wrath-of-toldir/events/update';
 export { Item } from './wrath-of-toldir/items/item';
+export { ItemTexture } from './wrath-of-toldir/items/item-texture';
 export { TileMap } from './wrath-of-toldir/maps/tile-map';
-export { PrivateStats } from './wrath-of-toldir/private-stats';
 export { Vec2 } from './wrath-of-toldir/vec2';

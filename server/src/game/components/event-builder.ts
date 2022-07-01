@@ -1,20 +1,20 @@
 import { AttackData, MagicAttack, NormalAttack } from "@/models/attacks";
 import { AttackCommand } from "@/models/commands";
 import { EntityInteraction } from "@/models/entities";
-import { AttackEvent, DamagedEvent, Entity as EntityEvent, Item, ItemCollectedEvent, ItemDropEvent, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
+import { AttackEvent, Character, DamagedEvent, Entity as EntityEvent, Item, ItemCollectedEvent, ItemDropEvent, ItemTexture, JoinEvent, LeaveEvent, MapChangedEvent, MapJoinedEvent, MoveEvent, TileMap, Update, Vec2 } from "@/models/events";
+import { DurabilityComponent, QualityComponent } from "@/models/items";
 import { MapLayer, TileCollision, TileSet } from "@/models/maps";
 import { ChatEvent } from "@/models/wrath-of-toldir/events/chat-event";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 import { EventLog } from "@/models/wrath-of-toldir/events/event-log";
-import { PrivateStats } from "@/models/wrath-of-toldir/private-stats";
-import { Builder, ByteBuffer } from "flatbuffers";
-import { EntityId, Entity, PlayerId, TiledJSON, Health } from "../game";
-import { Position, PositionKeeper } from "./position-keeper";
-import { parse as uuidParse } from 'uuid';
-import { ItemTexture } from "@/models/wrath-of-toldir/items/item-texture";
 import { Component } from "@/models/wrath-of-toldir/items/component";
 import { DamageComponent } from "@/models/wrath-of-toldir/items/damage-component";
+import { PrivateStats } from "@/models/wrath-of-toldir/private-stats";
+import { Builder } from "flatbuffers";
+import { parse as uuidParse } from 'uuid';
+import { Entity, EntityId, Health, PlayerId, TiledJSON } from "../game";
 import { ItemDrop } from "./item-hoarder";
+import { PickupWitnessType, Position, PositionKeeper } from "./position-keeper";
 
 type Effects = { builder: Builder, eventOffsets: number[], eventTypeOffsets: number[] };
 
@@ -42,6 +42,66 @@ export class EventBuilder {
         const events = this.tickEvents[playerId];
         delete this.tickEvents[playerId];
         return events;
+    }
+
+
+    private createItem = (builder: Builder, idOffset: number, item: Item) => {
+        const componentTypeOffsets: number[] = [];
+        const componentOffsets: number[] = [];
+        for (let i = 0; i < item.componentsLength(); i++) {
+            const type = item.componentsType(i)!;
+            if (type === Component.NONE) continue;
+            componentTypeOffsets.push(type);
+            switch (type) {
+                case Component.DamageComponent:
+                    const damage: DamageComponent = item.components(i, new DamageComponent());
+                    componentOffsets.push(DamageComponent.createDamageComponent(builder, damage.min()!, damage.max()!));
+                    break;
+                case Component.DurabilityComponent:
+                    const durability: DurabilityComponent = item.components(i, new DurabilityComponent());
+                    componentOffsets.push(DurabilityComponent.createDurabilityComponent(builder, durability.current()!, durability.maximum()!));
+                    break;
+                case Component.QualityComponent:
+                    const quality: QualityComponent = item.components(i, new QualityComponent());
+                    componentOffsets.push(QualityComponent.createQualityComponent(builder, quality.quality()!));
+                    break;
+                default: ((_: never) => { throw new Error("Should handle every state") })(type);
+            }
+        };
+
+        const componentTypesOffset = Item.createComponentsTypeVector(builder, componentTypeOffsets);
+        const componentsOffset = Item.createComponentsVector(builder, componentOffsets);
+        return Item.createItem(builder, idOffset, item.template()!, componentTypesOffset, componentsOffset);
+    }
+
+    private createCharacter = (builder: Builder, playerId: PlayerId, playerName: string, playerData: Entity, healthRecords: Record<EntityId, Health>) => {
+
+        // Name
+        const nameOffset = builder.createString(playerName);
+
+        // Player
+        EntityEvent.startEntity(builder);
+        EntityEvent.addCharLayer(builder, playerData.position.z);
+        EntityEvent.addInteraction(builder, EntityInteraction.Default); // TODO: interaction
+        EntityEvent.addKey(builder, playerData.key);
+        EntityEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
+        EntityEvent.addTexture(builder, playerData.texture);
+        EntityEvent.addHp(builder, healthRecords[playerId].current);
+        EntityEvent.addMaxHp(builder, healthRecords[playerId].max);
+        const playerOffset = EntityEvent.endEntity(builder);
+
+        // items
+        const items: Item[] = []; // TODO: this should be read from the player's inventory
+        const itemOffsets = items.map(item => this.createItem(builder, 0, item));
+        const itemsOffset = Character.createItemsVector(builder, itemOffsets);
+
+        Character.startCharacter(builder);
+        Character.addName(builder, nameOffset);
+        Character.addPlayer(builder, playerOffset);
+        Character.addStats(builder, PrivateStats.createPrivateStats(builder, 100, 100, 0, 1000, 1)); // TODO: Read from the player's character
+        Character.addGold(builder, 0); // TODO: read from the player's inventory
+        Character.addItems(builder, itemsOffset);
+        return Character.endCharacter(builder)
     }
 
     buildEventLog(playerId: string): Uint8Array | undefined {
@@ -134,24 +194,12 @@ export class EventBuilder {
         })
         const npcsVectorOffset = MapJoinedEvent.createNpcsVector(builder, npcOffsets);
 
-        EntityEvent.startEntity(builder);
-        EntityEvent.addCharLayer(builder, playerData.position.z);
-        EntityEvent.addInteraction(builder, EntityInteraction.Default); // TODO: interaction
-        EntityEvent.addKey(builder, playerData.key);
-        EntityEvent.addPos(builder, Vec2.createVec2(builder, playerData.position.x, playerData.position.y));
-        EntityEvent.addTexture(builder, playerData.texture);
-        EntityEvent.addHp(builder, healthRecords[playerId].current);
-        EntityEvent.addMaxHp(builder, healthRecords[playerId].max);
-        const playerOffset = EntityEvent.endEntity(builder);
+        const characterOffset = this.createCharacter(builder, playerId, playerName, playerData, healthRecords);
 
-        const nameOffset = builder.createString(playerName);
         MapJoinedEvent.startMapJoinedEvent(builder);
-        MapJoinedEvent.addName(builder, nameOffset);
-        MapJoinedEvent.addNpcs(builder, npcsVectorOffset);
-        MapJoinedEvent.addPlayer(builder, playerOffset);
         MapJoinedEvent.addTilemap(builder, tilemapOffset);
-        MapJoinedEvent.addStats(builder, PrivateStats.createPrivateStats(builder, 100, 100, 0, 1000, 1)); // TODO-HP
-
+        MapJoinedEvent.addNpcs(builder, npcsVectorOffset);
+        MapJoinedEvent.addCharacter(builder, characterOffset);
         eventOffsets.push(MapJoinedEvent.endMapJoinedEvent(builder));
         eventTypeOffsets.push(Update.MapJoinedEvent);
     }
@@ -190,7 +238,9 @@ export class EventBuilder {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
         let dataOffset = 0;
-        switch (attack.dataType()) {
+        const type = attack.dataType()!;
+        switch (type) {
+            case AttackData.NONE: break;
             case AttackData.NormalAttack:
                 const normal = attack.data(new NormalAttack()) as NormalAttack;
                 dataOffset = NormalAttack.createNormalAttack(builder, normal.facing());
@@ -202,6 +252,7 @@ export class EventBuilder {
                 MagicAttack.addTargetPos(builder, Vec2.createVec2(builder, magic.targetPos()!.x(), magic.targetPos()!.y()));
                 dataOffset = MagicAttack.endMagicAttack(builder);
                 break;
+            default: ((_: never) => { throw new Error("Should handle every state") })(type);
         }
         AttackEvent.startAttackEvent(builder);
         AttackEvent.addKey(builder, key);
@@ -221,36 +272,31 @@ export class EventBuilder {
     pushItemDrop(playerId: PlayerId, position: Position, item: ItemDrop) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
-        const componentType = Component.DamageComponent;
-        const componentTypeOffsets = Item.createComponentsTypeVector(builder, [componentType]);
-        // TODO: these should be set from the item database
-        const componentOffset = DamageComponent.createDamageComponent(builder, 4, 7);
-        const componentOffsets = Item.createComponentsVector(builder, [componentOffset]);
+        const idOffset = ItemDropEvent.createIdVector(builder, Uint8Array.from(uuidParse(item.id)));
 
-        const byteArray = uuidParse(item.id);
-        const idOffset = Item.createIdVector(builder, Uint8Array.from(byteArray));
-        const itemOffset = Item.createItem(builder, idOffset, ItemTexture.Sword, componentTypeOffsets, componentOffsets);
-
-        ItemDropEvent.startItemDropEvent(builder);
-        ItemDropEvent.addPos(builder, Vec2.createVec2(builder, position.x, position.y));
-        ItemDropEvent.addItem(builder, itemOffset);
-        eventOffsets.push(ItemDropEvent.endItemDropEvent(builder));
+        const itemDropOffset = ItemDropEvent.createItemDropEvent(builder, Vec2.createVec2(builder, position.x, position.y), idOffset, item.template);
+        eventOffsets.push(itemDropOffset);
         eventTypeOffsets.push(Update.ItemDropEvent);
     }
 
-    pushItemPickup(playerId: PlayerId, item: ItemDrop, key: number) {
+    pushItemPickup(playerId: PlayerId, item: Item, key: number, position: Position, type: PickupWitnessType) {
         const { builder, eventOffsets, eventTypeOffsets } = this.tickEventsForPlayer(playerId);
 
-        const byteArray = uuidParse(item.id);
-        const idOffset = Item.createIdVector(builder, Uint8Array.from(byteArray));
+        const idOffset = ItemCollectedEvent.createIdVector(builder, item.idArray()!);
+        let itemOffset = 0;
+        if (type === PickupWitnessType.Detailed) {
+            itemOffset = this.createItem(builder, idOffset, item);
+        }
 
         ItemCollectedEvent.startItemCollectedEvent(builder);
-        ItemCollectedEvent.addId(builder, idOffset);
         ItemCollectedEvent.addKey(builder, key);
-        ItemCollectedEvent.addPos(builder, Vec2.createVec2(builder, item.position.x, item.position.y));
+        ItemCollectedEvent.addPos(builder, Vec2.createVec2(builder, position.x, position.y));
+        ItemCollectedEvent.addId(builder, idOffset);
+        if (type === PickupWitnessType.Detailed) {
+            ItemCollectedEvent.addItem(builder, itemOffset);
+        }
         eventOffsets.push(ItemCollectedEvent.endItemCollectedEvent(builder));
         eventTypeOffsets.push(Update.ItemCollectedEvent);
 
     }
-
 }

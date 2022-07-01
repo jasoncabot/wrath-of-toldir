@@ -1,31 +1,30 @@
 import { Router } from 'itty-router';
+import Randomiser from './game/components/randomiser';
 
 import { CharacterHandler, MapHandler } from './handlers';
-import { withUser } from './middleware';
-import { RequestWithUser, requireUser } from './middleware/auth';
+import { allowCrossOriginRequests, notFound, RequestWithUser, requireUser, withUser } from './middleware';
 
 const router = Router<RequestWithUser>({ base: '/api' })
   .get('/characters', withUser, requireUser, CharacterHandler.list)
   .post('/characters', withUser, requireUser, CharacterHandler.create)
   .get('/map/:id/connection', MapHandler.connect)
   .get('/map/:id', withUser, requireUser, MapHandler.show)
-  .options('*', (_, env: Bindings) => new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': env.FRONTEND_URI,
-      'Access-Control-Allow-Headers': 'Authorization, Upgrade-Insecure-Requests'
-    }
-  }))
-  .get('*', (_: Request) => new Response('Handler not registered', { status: 404 }));
+  .options('*', allowCrossOriginRequests)
+  .get('*', notFound('Handler not registered'));
 
 const worker: ExportedHandler<Bindings> = {
   fetch: async (request: Request, env: Bindings, context: ExecutionContext) => {
+    env.dependencies = {
+      randomiser: new Randomiser()
+    }
+
     return router.handle(request, env, context);
   }
 };
 
-export { Map } from "./durable-objects/map";
-export { Combat } from "./durable-objects/combat";
 export { Character } from "./durable-objects/character";
+export { Combat } from "./durable-objects/combat";
 export { Item } from "./durable-objects/item";
+export { Map } from "./durable-objects/map";
+
 export default worker;

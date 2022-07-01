@@ -22,9 +22,9 @@ export default class FloatingHealthBar extends Phaser.GameObjects.Graphics {
         this.background.lineStyle(1, 0xFFFFFF);
         this.background.strokeRect(-(width / 2), 0, width, height);
 
-        this.bar = this.scene.add.graphics({ x: x + 1, y: y + 1 }).setAlpha(0.8);
+        this.bar = this.scene.add.graphics({ x: -(width / 2), y: y + 1 }).setAlpha(0.8);
         this.bar.fillGradientStyle(0xE83B3B, 0xE83B3B, 0xAE2334, 0xAE2334);
-        this.bar.fillRect(0, 0, width - 2, height - 2);
+        this.bar.fillRect(0, 0, width - 1, height - 1);
 
         scene.interfaceCamera.ignore([this, this.background, this.bar]);
 
@@ -39,7 +39,7 @@ export default class FloatingHealthBar extends Phaser.GameObjects.Graphics {
     setPosition(x?: number, y?: number, z?: number, w?: number): this {
         super.setPosition(x, y, z, w);
         this.background?.setPosition(x, y).setDepth(this.depth + 1);
-        this.bar?.setPosition((x ?? 0) - ((width / 2) - 1), (y ?? 0) + 1).setDepth(this.depth + 1);
+        this.bar?.setPosition((x ?? 0) - (width / 2), (y ?? 0) + 1).setDepth(this.depth + 1);
         return this;
     }
 

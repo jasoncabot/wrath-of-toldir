@@ -2,9 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { Character } from '../../wrath-of-toldir/character';
 import { Entity } from '../../wrath-of-toldir/entity';
 import { TileMap } from '../../wrath-of-toldir/maps/tile-map';
-import { PrivateStats } from '../../wrath-of-toldir/private-stats';
 
 
 export class MapJoinedEvent {
@@ -25,56 +25,36 @@ static getSizePrefixedRootAsMapJoinedEvent(bb:flatbuffers.ByteBuffer, obj?:MapJo
   return (obj || new MapJoinedEvent()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-name():string|null
-name(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-name(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
-}
-
-player(obj?:Entity):Entity|null {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? (obj || new Entity()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
-}
-
 tilemap(obj?:TileMap):TileMap|null {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? (obj || new TileMap()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 npcs(index: number, obj?:Entity):Entity|null {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
+  const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? (obj || new Entity()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
 }
 
 npcsLength():number {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
+  const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
-stats(obj?:PrivateStats):PrivateStats|null {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? (obj || new PrivateStats()).__init(this.bb_pos + offset, this.bb!) : null;
+character(obj?:Character):Character|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? (obj || new Character()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 static startMapJoinedEvent(builder:flatbuffers.Builder) {
-  builder.startObject(5);
-}
-
-static addName(builder:flatbuffers.Builder, nameOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(0, nameOffset, 0);
-}
-
-static addPlayer(builder:flatbuffers.Builder, playerOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, playerOffset, 0);
+  builder.startObject(3);
 }
 
 static addTilemap(builder:flatbuffers.Builder, tilemapOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, tilemapOffset, 0);
+  builder.addFieldOffset(0, tilemapOffset, 0);
 }
 
 static addNpcs(builder:flatbuffers.Builder, npcsOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, npcsOffset, 0);
+  builder.addFieldOffset(1, npcsOffset, 0);
 }
 
 static createNpcsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
@@ -89,8 +69,8 @@ static startNpcsVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
 }
 
-static addStats(builder:flatbuffers.Builder, statsOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(4, statsOffset, 0);
+static addCharacter(builder:flatbuffers.Builder, characterOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, characterOffset, 0);
 }
 
 static endMapJoinedEvent(builder:flatbuffers.Builder):flatbuffers.Offset {

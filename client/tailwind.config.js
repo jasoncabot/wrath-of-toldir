@@ -3,7 +3,7 @@ module.exports = {
   darkMode: 'class',
   theme: {
     fontFamily: {
-      sans: ["'Press Start 2P'", 'sans-serif']
+      sans: ["'Press Start 2P'", 'Verdana', 'sans-serif']
     },
     extend: {},
   },

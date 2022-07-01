@@ -1,4 +1,5 @@
 import { Position } from "@/game/components/position-keeper";
+import Randomiser from "@/game/components/randomiser";
 import { EntityId } from "@/game/game";
 import { DamageState } from "@/models/wrath-of-toldir/events/damage-state";
 
@@ -95,14 +96,17 @@ export class Combat implements DurableObject {
 
                 return new Response(JSON.stringify(result as AttackResult), { status: 200 });
             }
+
+            default: ((_: never) => { throw new Error("Should handle every state") })(action);
         }
     }
 
     private onEntitySpawned() {
-        // TODO: these shouldn't be this random
-        const attack = Math.floor(Math.random() * 19) + 1;
-        const defence = Math.floor(Math.random() * 19) + 1;
-        const hp = Math.floor(Math.random() * 100);
+        const { randomiser } = this.env.dependencies;
+
+        const attack = randomiser.between(8, 16);
+        const defence = randomiser.between(8, 16);
+        const hp = randomiser.between(50, 100);
 
         this.state.storage.put("attack", attack);
         this.state.storage.put("defence", defence);

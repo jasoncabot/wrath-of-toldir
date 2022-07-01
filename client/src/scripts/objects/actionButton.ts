@@ -11,6 +11,7 @@ const textForType = (type: ActionButtonType) => {
         case ActionButtonType.NormalAttack: return "1\nATK";
         case ActionButtonType.MagicAttack: return "2\nMAG";
         case ActionButtonType.Potion: return "3\nPOT";
+        default: ((_: never) => { throw new Error("Should handle every state") })(type);
     }
 }
 

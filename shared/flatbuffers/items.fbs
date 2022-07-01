@@ -10,8 +10,25 @@ table DamageComponent {
     max: uint8;
 }
 
+enum ItemQuality : byte {
+    Normal,
+    Low,
+    High
+}
+
+table QualityComponent {
+    quality: ItemQuality;
+}
+
+table DurabilityComponent {
+    current: uint8;
+    maximum: uint8;
+}
+
 union Component {
-    DamageComponent
+    DamageComponent,
+    QualityComponent,
+    DurabilityComponent
 }
 
 table Item {

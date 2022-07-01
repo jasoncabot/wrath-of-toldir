@@ -11,7 +11,17 @@ const maps: Record<string, any> = {
     testdungeon1
 }
 
-const toCollisionBitMask = (properties: { name: string, type: string, value: boolean }[]) => {
+type PropertyName = "ge_collide_up"
+    | "ge_collide_down"
+    | "ge_collide_left"
+    | "ge_collide_right"
+    | "ge_collide_up-left"
+    | "ge_collide_up-right"
+    | "ge_collide_down-left"
+    | "ge_collide_down-right"
+    ;
+
+const toCollisionBitMask = (properties: { name: PropertyName, type: string, value: boolean }[]) => {
     let collisions: number = 0b00000000;
     properties.forEach(({ name, value }) => {
         if (!value) return;
@@ -40,6 +50,7 @@ const toCollisionBitMask = (properties: { name: string, type: string, value: boo
             case "ge_collide_down-right":
                 collisions |= 0b00000001;
                 break;
+            default: ((_: never) => { throw new Error("Should handle every state") })(name);
         }
     });
     return collisions as number;
@@ -50,7 +61,7 @@ const parseTileSets: (map: TiledJSON) => MapTileSet[] = (map: TiledJSON) => {
         return {
             key: set.name,
             gid: set.firstgid,
-            collisions: (set.tiles || []).map((tile: { id: number, properties: { name: string, type: string, value: boolean }[] | undefined }) => {
+            collisions: (set.tiles || []).map((tile: { id: number, properties: { name: PropertyName, type: string, value: boolean }[] | undefined }) => {
                 return {
                     // we calculate the global index here to save the 
                     // client from having to do so

@@ -40,11 +40,9 @@ table DamagedEvent {
 }
 
 table MapJoinedEvent {
-    name: string;
-    player: WrathOfToldir.Entity;
     tilemap: WrathOfToldir.Maps.TileMap;
     npcs: [WrathOfToldir.Entity];
-    stats: WrathOfToldir.PrivateStats;
+    character: WrathOfToldir.Character;
 }
 
 table MapChangedEvent {
@@ -53,18 +51,25 @@ table MapChangedEvent {
     char_layer: Elevation;
 }
 
+// We give minimal information about an item when it drops (no components)
+// to allow us to display it but not much more. The real information is sent
+// when it's collected and then, only to the player who collects it
 table ItemDropEvent {
     pos: Vec2;
-    item: WrathOfToldir.Items.Item;
+    id: [uint8];
+    // type of item that was dropped
+    template: WrathOfToldir.Items.ItemTexture;
 }
 
 table ItemCollectedEvent {
-    // player who picked the item up
+    // public id of the player who picked the item up
     key: uint32; 
     // where the item was located
     pos: Vec2;
-    // id of the item that was collected
+    // id of the item that was picked up, always sent so clients can identify and remove it correctly
     id: [uint8];
+    // more details about the item that are only sent to the player who picked it up
+    item: WrathOfToldir.Items.Item;
 }
 
 union Update { 
