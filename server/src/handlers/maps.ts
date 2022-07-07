@@ -2,7 +2,7 @@ import { validMaps } from "@/data/maps";
 import { PlayableCharacter } from "@/durable-objects/character";
 import { MapAction } from "@/durable-objects/map";
 import { PlayerId } from "@/game/game";
-import { notFound } from "@/middleware";
+import { corsHeaders, notFound } from "@/middleware";
 import { RequestWithUser } from "@/middleware/auth";
 import { Request } from "itty-router";
 import { v4 as uuidv4 } from 'uuid';
@@ -28,7 +28,8 @@ const show = async (request: RequestWithUser, env: Bindings, ctx: ExecutionConte
             "X-PlayerId": request.user!.id,
             "X-CharacterId": characterId,
             "X-Socket-Key": uuidv4(),
-            "X-MapId": mapId
+            "X-MapId": mapId,
+            ...corsHeaders(env)
         }
     });
 };

@@ -54,7 +54,6 @@ export class Combat implements DurableObject {
     }
 
     async fetch(request: Request): Promise<Response> {
-
         const searchParams = new URLSearchParams(new URL(request.url).search);
         const action = searchParams.get('action') as CombatAction;
 
@@ -102,7 +101,7 @@ export class Combat implements DurableObject {
     }
 
     private onEntitySpawned() {
-        const { randomiser } = this.env.dependencies;
+        const randomiser = new Randomiser();
 
         const attack = randomiser.between(8, 16);
         const defence = randomiser.between(8, 16);

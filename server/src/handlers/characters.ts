@@ -1,3 +1,4 @@
+import { corsHeaders } from "@/middleware";
 import { RequestWithUser } from "@/middleware/auth";
 
 const list = async (request: RequestWithUser, env: Bindings, ctx: ExecutionContext) => {
@@ -9,8 +10,8 @@ const list = async (request: RequestWithUser, env: Bindings, ctx: ExecutionConte
     return new Response(characterList, {
         status: 200,
         headers: {
-            'Access-Control-Allow-Origin': env.FRONTEND_URI,
             'Content-type': 'application/json',
+            ...corsHeaders(env)
         },
     });
 };
@@ -29,8 +30,8 @@ const create = async (request: RequestWithUser, env: Bindings, ctx: ExecutionCon
     return new Response(created, {
         status: 201,
         headers: {
-            'Access-Control-Allow-Origin': env.FRONTEND_URI,
             'Content-type': 'application/json',
+            ...corsHeaders(env)
         },
     });
 }

@@ -4,7 +4,9 @@ import { CommandQueue } from "@/game/components/command-queue";
 import { EventBuilder } from "@/game/components/event-builder";
 import { ItemHoarder } from "@/game/components/item-hoarder";
 import { Position, PositionKeeper } from "@/game/components/position-keeper";
+import Randomiser from "@/game/components/randomiser";
 import { Entity, EntityId, Health, PlayerId, TiledJSON } from "@/game/game";
+import { corsHeaders } from "@/middleware";
 import { Action, LeaveCommand } from "@/models/commands";
 import { Command } from "@/models/wrath-of-toldir/commands/command";
 import { Builder, ByteBuffer } from "flatbuffers";
@@ -34,6 +36,7 @@ export class Map implements DurableObject {
     eventBuilder: EventBuilder;
     ai!: ArtificialIntelligence;
     itemHoarder: ItemHoarder;
+    randomiser: Randomiser;
 
     constructor(private readonly state: DurableObjectState, private readonly env: Bindings) {
         this.state = state;
@@ -44,8 +47,9 @@ export class Map implements DurableObject {
         this.mapData = undefined;
         this.npcs = {};
         this.eventBuilder = new EventBuilder();
+        this.randomiser = new Randomiser();
         this.positionKeeper = new PositionKeeper(this.state.storage, this.env.MAP, this.env.CHARACTER);
-        this.itemHoarder = new ItemHoarder(this.env.ITEM, env.dependencies.randomiser);
+        this.itemHoarder = new ItemHoarder(this.env.ITEM, this.randomiser);
         this.healthRecords = {};
     }
 
@@ -54,8 +58,8 @@ export class Map implements DurableObject {
         this.mapData = loadMapData(mapId);
         // TODO: slice and dice these dependencies a bit better, perhaps put them in a context
         this.positionKeeper.updateWithMap(this.mapData);
-        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.itemHoarder, this.env.dependencies.randomiser);
-        this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.env.dependencies.randomiser);
+        this.commandQueue = new CommandQueue(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.itemHoarder, this.randomiser);
+        this.ai = new ArtificialIntelligence(this.mapData, this.positionKeeper, this.eventBuilder, this.connections, this.npcs, this.healthRecords, this.env.COMBAT, this.randomiser);
     }
 
     async fetch(request: Request) {
@@ -101,8 +105,8 @@ export class Map implements DurableObject {
                     return new Response(null, {
                         status: 101,
                         headers: {
-                            'Access-Control-Allow-Origin': this.env.FRONTEND_URI,
                             'Content-type': 'application/json',
+                            ...corsHeaders(this.env)
                         },
                         webSocket: client
                     });
@@ -115,8 +119,8 @@ export class Map implements DurableObject {
                     return new Response(JSON.stringify(pos), {
                         status: 200,
                         headers: {
-                            'Access-Control-Allow-Origin': this.env.FRONTEND_URI,
-                            'Content-type': 'application/json'
+                            'Content-type': 'application/json',
+                            ...corsHeaders(this.env)
                         }
                     });
                 }
@@ -136,8 +140,8 @@ export class Map implements DurableObject {
                     return new Response(socketKey, {
                         status: 201,
                         headers: {
-                            'Access-Control-Allow-Origin': this.env.FRONTEND_URI,
-                            'Content-type': 'text/plain'
+                            'Content-type': 'text/plain',
+                            ...corsHeaders(this.env)
                         }
                     });
                 }

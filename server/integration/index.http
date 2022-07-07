@@ -1,33 +1,33 @@
 @playerId = {{$guid}}
+@startingLocation = testroom1
 
 ### Create character
 # @name create
 POST http://127.0.0.1:8787/api/characters
 Content-type: application/json
-Authorization: Bearer 12345
+Authorization: Bearer {{playerId}}
 
 {
-    "name": "{{$guid}}",
-    "texture": "hero1"
+    "name": "{{$datetime iso8601}}",
+    "texture": 18
 }
 
 ### List characters
 GET http://127.0.0.1:8787/api/characters
 Content-type: application/json
-Authorization: Bearer 12345
-
+Authorization: {{create.request.headers.Authorization}}
 
 ### Show map fairweather
 # @name show
-GET http://127.0.0.1:8787/api/map/fisherswatch
+GET http://127.0.0.1:8787/api/map/{{startingLocation}}?characterId={{create.response.body.id}}
 Content-type: application/json
-Authorization: Bearer {{playerId}}
+Authorization: {{create.request.headers.Authorization}}
 
 ### Connect WebSocket
 
 @token = {{show.response.body.*}}
 
 # @name connect
-GET http://127.0.0.1:8787/api/map/fisherswatch/connection?token={{token}}
+GET http://127.0.0.1:8787/api/map/{{startingLocation}}/connection?token={{token}}
 Content-type: application/json
 Upgrade: websocket

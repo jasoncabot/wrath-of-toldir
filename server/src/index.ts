@@ -1,5 +1,4 @@
 import { Router } from 'itty-router';
-import Randomiser from './game/components/randomiser';
 
 import { CharacterHandler, MapHandler } from './handlers';
 import { allowCrossOriginRequests, notFound, RequestWithUser, requireUser, withUser } from './middleware';
@@ -10,21 +9,19 @@ const router = Router<RequestWithUser>({ base: '/api' })
   .get('/map/:id/connection', MapHandler.connect)
   .get('/map/:id', withUser, requireUser, MapHandler.show)
   .options('*', allowCrossOriginRequests)
-  .get('*', notFound('Handler not registered'));
+  ;
+
+const baseRouter = Router()
+  .all('/api/*', router.handle)
+  .all('*', notFound('Route not registered'))
+  ;
 
 const worker: ExportedHandler<Bindings> = {
   fetch: async (request: Request, env: Bindings, context: ExecutionContext) => {
-    env.dependencies = {
-      randomiser: new Randomiser()
-    }
-
-    return router.handle(request, env, context);
+    return baseRouter.handle(request, env, context);
   }
 };
 
-export { Character } from "./durable-objects/character";
-export { Combat } from "./durable-objects/combat";
-export { Item } from "./durable-objects/item";
-export { Map } from "./durable-objects/map";
+export * from "./durable-objects";
 
 export default worker;
